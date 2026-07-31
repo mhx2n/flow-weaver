@@ -22,10 +22,19 @@ except (TypeError, ValueError):
     pass  # leave as comma-separated string; section 01 will normalise
 
 
+# ─── Optional: Telegram Rich Messages (native tables / LaTeX / task lists) ───
+# Get these from https://my.telegram.org → API development tools.
+# If unset, the bot still works exactly as before (classic HTML formatting).
+TELEGRAM_API_ID: str = os.getenv("TELEGRAM_API_ID", os.getenv("API_ID", "")).strip()
+TELEGRAM_API_HASH: str = os.getenv("TELEGRAM_API_HASH", os.getenv("API_HASH", "")).strip()
+
+
 def as_runtime_globals() -> dict:
     """Return the config values that must be present in the shared
     namespace before any section executes."""
     return {
         "BOT_TOKEN": BOT_TOKEN,
         "OWNER_ID": OWNER_ID,
+        "TELEGRAM_API_ID": TELEGRAM_API_ID,
+        "TELEGRAM_API_HASH": TELEGRAM_API_HASH,
     }
