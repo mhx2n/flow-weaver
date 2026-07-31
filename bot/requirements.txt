@@ -9,3 +9,5 @@ pymongo[srv]>=4.6
 PyMuPDF>=1.24
 # Fallback PDF rasterizer (pure-pip, no system poppler required)
 pypdfium2>=4.30
+# Telegram Rich Messages (native tables / LaTeX / task lists) via MTProto
+telethon>=1.41

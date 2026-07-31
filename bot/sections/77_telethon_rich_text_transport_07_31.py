@@ -383,7 +383,7 @@ if _orig_send_77 is not None:
                 )
                 if sent:
                     return sent
-        return await _orig_send_77(self, chat_id=chat_id, text=text, *args, **kwargs)
+        return await _orig_send_77(self, chat_id, text, *args, **kwargs)
 
     async def _edit_message_text_rich_77(self, text=None, *args, **kwargs):
         if text is None:
@@ -408,7 +408,7 @@ if _orig_send_77 is not None:
                                         parse_mode=kwargs.get("parse_mode"))
                 if ok:
                     return _RichSentMessage77(self, chat_id, message_id, text)
-        return await _orig_edit_77(self, text=text, *args, **kwargs)
+        return await _orig_edit_77(self, text, *args, **kwargs)
 
     with _cx77.suppress(Exception):
         _PTBBot77.send_message = _send_message_rich_77
