@@ -1,0 +1,2 @@
+# Render reads this automatically.
+-r bot/requirements.txt

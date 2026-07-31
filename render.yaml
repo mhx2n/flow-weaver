@@ -1,0 +1,61 @@
+# Render Blueprint — Free Web Service
+# Deploy: New + → Blueprint → point at this repo. Render reads render.yaml.
+services:
+  - type: web
+    name: probaho-bot
+    runtime: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # ─── REQUIRED ──────────────────────────────────────────────────
+      - key: BOT_TOKEN              # @BotFather token
+        sync: false
+      - key: OWNER_ID               # numeric Telegram id (or comma-separated)
+        sync: false
+
+      # ─── AI providers (set whichever you use) ──────────────────────
+      - key: GEMINI_API_KEY         # single key
+        sync: false
+      - key: GEMINI_API_KEYS        # OR comma-separated multi-key pool
+        sync: false
+      - key: MISTRAL_API_KEY        # OCR (image/PDF)
+        sync: false
+      - key: ELEVENLABS_API_KEY     # Voice-to-Text
+        sync: false
+
+      # ─── MongoDB persistent backup (PATCH-R) ───────────────────────
+      - key: MONGODB_URI            # mongodb+srv://user:pass@cluster/...
+        sync: false
+      - key: MONGODB_DB
+        value: probaho_db
+
+      # ─── Optional GitHub backup (PATCH-R alt) ──────────────────────
+      - key: GITHUB_BACKUP_TOKEN
+        sync: false
+      - key: GITHUB_BACKUP_REPO     # e.g. mhx2n/flow-forward-a5dd1c4e
+        sync: false
+      - key: GITHUB_BACKUP_BRANCH
+        value: main
+      - key: GITHUB_BACKUP_PATH
+        value: backups/probaho_bot.sqlite3
+      - key: GITHUB_BACKUP_SYNC_SECONDS
+        value: "3600"
+
+      # ─── Optional model overrides ──────────────────────────────────
+      - key: GEMINI_MODEL_TEXT
+        sync: false
+      - key: GEMINI_MODEL_VISION
+        sync: false
+      - key: MISTRAL_OCR_MODEL
+        sync: false
+
+      # ─── Runtime ───────────────────────────────────────────────────
+      - key: PORT
+        value: "10000"
+      - key: PYTHON_VERSION
+        value: 3.11.9

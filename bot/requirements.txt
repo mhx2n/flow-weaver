@@ -1,0 +1,11 @@
+# প্রবাহ bot — Python runtime dependencies
+python-telegram-bot>=21.0
+requests>=2.31
+beautifulsoup4>=4.12
+pandas>=2.0
+# Optional — only needed if you enable the MongoDB persistent backup (PATCH-R)
+pymongo[srv]>=4.6
+# PDF → image rasterization for Mistral OCR (PyMuPDF wheel "fitz")
+PyMuPDF>=1.24
+# Fallback PDF rasterizer (pure-pip, no system poppler required)
+pypdfium2>=4.30
