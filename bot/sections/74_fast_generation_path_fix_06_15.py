@@ -161,7 +161,42 @@ def _json_items_74(raw):
         val = data.get(key)
         if isinstance(val, list):
             return val
+    # A few otherwise-compatible providers return one MCQ object directly.
+    if any(k in data for k in ("question", "q", "stem")):
+        return [data]
     return []
+
+
+def _partial_json_items_74(raw):
+    """Recover complete MCQ objects from a response truncated mid-array.
+
+    Providers sometimes stop at their output-token limit after writing several
+    valid items and half of the next one.  Discarding the whole response makes
+    healthy providers look broken, especially for Bengali/math output.
+    """
+    text = str(raw or "")
+    marker = _re74.search(r'"(?:items|mcqs|questions|quizzes|data)"\s*:\s*\[', text, _re74.I)
+    start = marker.end() if marker else text.find("[") + 1
+    if start <= 0:
+        return []
+    decoder = _json74.JSONDecoder()
+    items = []
+    pos = start
+    while pos < len(text):
+        while pos < len(text) and text[pos] in " \t\r\n,":
+            pos += 1
+        if pos >= len(text) or text[pos] in "]}":
+            break
+        try:
+            value, end = decoder.raw_decode(text, pos)
+        except Exception:
+            # The first incomplete value marks the truncated tail.  Objects
+            # decoded before it are complete and safe to keep.
+            break
+        if isinstance(value, dict):
+            items.append(value)
+        pos = end
+    return items
 
 
 def _answer_to_int_74(value, opts, *, zero_based=False):
@@ -253,18 +288,65 @@ def _make_fast_new_mcq_prompt_74(source_text, n, *, easy=0, medium=0, hard=0, av
 
 def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoid_text=""):
     prompt = _make_fast_new_mcq_prompt_74(source_text, need, easy=easy, medium=medium, hard=hard, avoid_text=avoid_text)
-    raw = ""
-    try:
-        raw, _used = _adv_call_text(prompt, force_json=True, timeout=18)
-    except Exception as e:
-        db_log("WARN", "fast_gen_adv_failed_74", {"error": str(e)[:180]})  # type: ignore[name-defined]
-        return []
-    out = []
-    for item in _json_items_74(raw):
-        norm = _normalise_mcq_74(item)
-        if norm:
-            out.append(norm)
-    return out
+    rows = []
+    with _cx74.suppress(Exception):
+        rows = sorted(list(_adv_load() or []), key=_provider_sort_key_74)  # type: ignore[name-defined]
+
+    # _adv_call_text stops at the first non-empty response.  That is correct for
+    # normal chat, but wrong for quiz generation: a provider can return prose or
+    # malformed JSON and prevent every healthy provider after it from running.
+    # Validate each provider here and continue the cascade until usable MCQs are
+    # found.  The cap keeps worst-case latency bounded.
+    attempted = 0
+    last_error = ""
+    for prov in rows:
+        if not prov.get("enabled") or attempted >= 5:
+            continue
+        age = _time74.time() - float(prov.get("last_error_ts") or 0)
+        if not prov.get("healthy") and age < 480:
+            continue
+        attempted += 1
+        try:
+            raw = _adv_call_provider(prov, prompt, force_json=True, timeout=14)  # type: ignore[name-defined]
+            out = []
+            parsed = _json_items_74(raw) or _partial_json_items_74(raw)
+            for item in parsed:
+                norm = _normalise_mcq_74(item)
+                if norm:
+                    out.append(norm)
+            if out:
+                _adv_mark_success(prov)  # type: ignore[name-defined]
+                return out
+            last_error = "non-empty response contained no valid MCQ JSON"
+            _adv_mark_failure(prov, last_error, quota=False)  # type: ignore[name-defined]
+        except Exception as e:
+            last_error = str(e)
+            with _cx74.suppress(Exception):
+                _adv_mark_failure(prov, last_error, quota=_adv_is_quota_err(last_error))  # type: ignore[name-defined]
+
+    # Preserve the configured built-in Gemini route as a bounded fallback when
+    # no Advanced Mode provider produced valid JSON (or none are configured).
+    builtin = globals().get("call_gemini_text_rest")
+    if callable(builtin):
+        try:
+            raw = builtin(prompt, timeout_seconds=20, force_json=True)
+            out = []
+            parsed = _json_items_74(raw) or _partial_json_items_74(raw)
+            for item in parsed:
+                norm = _normalise_mcq_74(item)
+                if norm:
+                    out.append(norm)
+            if out:
+                return out
+        except Exception as e:
+            last_error = str(e)
+
+    with _cx74.suppress(Exception):
+        db_log("WARN", "fast_gen_all_invalid_74", {  # type: ignore[name-defined]
+            "providers_attempted": attempted,
+            "error": last_error[:220],
+        })
+    return []
 
 
 def _generate_quizzes_from_ocr_sync(ocr_ctx, desired, user_id):  # noqa: F811
@@ -274,8 +356,10 @@ def _generate_quizzes_from_ocr_sync(ocr_ctx, desired, user_id):  # noqa: F811
     desired = max(1, min(int(desired or 1), 200))
     avoid = _source_avoid_text_74(ocr_ctx)
     out, seen = [], set()
-    batch = 15 if desired > 20 else min(10, desired)
-    rounds = max(1, min(6, (desired + batch - 1) // batch + 1))
+    # Smaller batches prevent Bengali/math JSON from being cut at common
+    # provider output limits. More bounded rounds retain the same total count.
+    batch = min(8, desired)
+    rounds = max(1, min(12, (desired + batch - 1) // batch + 1))
     for _ in range(rounds):
         if len(out) >= desired:
             break
@@ -283,6 +367,12 @@ def _generate_quizzes_from_ocr_sync(ocr_ctx, desired, user_id):  # noqa: F811
         recent = "\n".join("- " + x["question"][:140] for x in out[-20:])
         items = _generate_batch_fast_74(source_text, need, avoid_text=(avoid + "\n" + recent).strip())
         if not items:
+            # One provider may have produced a transient truncated response.
+            # Allow a second bounded round instead of failing the whole command
+            # immediately; provider health marking makes the retry use another
+            # backend rather than repeating the same bad response.
+            if not out and _ < 1:
+                continue
             break
         for it in items:
             sig = _re74.sub(r"\s+", " ", it["question"]).lower()[:100]
