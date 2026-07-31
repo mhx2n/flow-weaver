@@ -350,10 +350,32 @@ except Exception:
 
 def _unsupported_kwargs_77(kwargs):
     """Cases MTProto rich path should not handle → keep classic transport."""
-    for k in ("reply_markup", "entities", "link_preview_options"):
+    # Inline keyboards are attached in a second, documented Bot API call after
+    # the rich MTProto send/edit succeeds.  Treating reply_markup as unsupported
+    # made every final AI answer miss this transport because those answers carry
+    # the Verify keyboard.
+    for k in ("entities", "link_preview_options"):
         if kwargs.get(k) is not None:
             return True
     return False
+
+
+async def _attach_markup_77(bot, chat_id, message_id, reply_markup):
+    """Attach/replace an inline keyboard without downgrading rich message text."""
+    if reply_markup is None or not message_id:
+        return True
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=reply_markup,
+        )
+        return True
+    except Exception as e:
+        # The answer itself is more important than an optional action keyboard.
+        # Keep the native rich result and record the non-fatal keyboard failure.
+        _log77("rich text sent; keyboard attach failed: %s" % e)
+        return False
 
 
 if _orig_send_77 is not None:
@@ -382,6 +404,9 @@ if _orig_send_77 is not None:
                     silent=bool(kwargs.get("disable_notification")),
                 )
                 if sent:
+                    await _attach_markup_77(
+                        self, chat_id, sent.message_id, kwargs.get("reply_markup")
+                    )
                     return sent
         return await _orig_send_77(self, chat_id, text, *args, **kwargs)
 
@@ -407,6 +432,9 @@ if _orig_send_77 is not None:
                 ok = await rich_edit_77(chat_id, message_id, text,
                                         parse_mode=kwargs.get("parse_mode"))
                 if ok:
+                    await _attach_markup_77(
+                        self, chat_id, message_id, kwargs.get("reply_markup")
+                    )
                     return _RichSentMessage77(self, chat_id, message_id, text)
         return await _orig_edit_77(self, text, *args, **kwargs)
 
