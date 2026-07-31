@@ -167,6 +167,38 @@ def _json_items_74(raw):
     return []
 
 
+def _partial_json_items_74(raw):
+    """Recover complete MCQ objects from a response truncated mid-array.
+
+    Providers sometimes stop at their output-token limit after writing several
+    valid items and half of the next one.  Discarding the whole response makes
+    healthy providers look broken, especially for Bengali/math output.
+    """
+    text = str(raw or "")
+    marker = _re74.search(r'"(?:items|mcqs|questions|quizzes|data)"\s*:\s*\[', text, _re74.I)
+    start = marker.end() if marker else text.find("[") + 1
+    if start <= 0:
+        return []
+    decoder = _json74.JSONDecoder()
+    items = []
+    pos = start
+    while pos < len(text):
+        while pos < len(text) and text[pos] in " \t\r\n,":
+            pos += 1
+        if pos >= len(text) or text[pos] in "]}":
+            break
+        try:
+            value, end = decoder.raw_decode(text, pos)
+        except Exception:
+            # The first incomplete value marks the truncated tail.  Objects
+            # decoded before it are complete and safe to keep.
+            break
+        if isinstance(value, dict):
+            items.append(value)
+        pos = end
+    return items
+
+
 def _answer_to_int_74(value, opts, *, zero_based=False):
     try:
         n = int(value)
@@ -277,7 +309,8 @@ def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoi
         try:
             raw = _adv_call_provider(prov, prompt, force_json=True, timeout=14)  # type: ignore[name-defined]
             out = []
-            for item in _json_items_74(raw):
+            parsed = _json_items_74(raw) or _partial_json_items_74(raw)
+            for item in parsed:
                 norm = _normalise_mcq_74(item)
                 if norm:
                     out.append(norm)
@@ -298,7 +331,8 @@ def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoi
         try:
             raw = builtin(prompt, timeout_seconds=20, force_json=True)
             out = []
-            for item in _json_items_74(raw):
+            parsed = _json_items_74(raw) or _partial_json_items_74(raw)
+            for item in parsed:
                 norm = _normalise_mcq_74(item)
                 if norm:
                     out.append(norm)
@@ -322,8 +356,10 @@ def _generate_quizzes_from_ocr_sync(ocr_ctx, desired, user_id):  # noqa: F811
     desired = max(1, min(int(desired or 1), 200))
     avoid = _source_avoid_text_74(ocr_ctx)
     out, seen = [], set()
-    batch = 15 if desired > 20 else min(10, desired)
-    rounds = max(1, min(6, (desired + batch - 1) // batch + 1))
+    # Smaller batches prevent Bengali/math JSON from being cut at common
+    # provider output limits. More bounded rounds retain the same total count.
+    batch = min(8, desired)
+    rounds = max(1, min(12, (desired + batch - 1) // batch + 1))
     for _ in range(rounds):
         if len(out) >= desired:
             break
