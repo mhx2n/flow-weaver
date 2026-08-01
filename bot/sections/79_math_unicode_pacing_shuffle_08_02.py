@@ -198,7 +198,7 @@ def mathify_79(text: str) -> str:
     s = _accent_79(s)
 
     # degree written as ^circ / ^{\circ}
-    s = _re79.sub(r"\^\s*\{?\s*\\?(?:circ|degree|deg)\s*\}?", "°", s)
+    s = _re79.sub(r"\^\s*(?:\{\s*\\?(?:circ|degree|deg)\s*\}|\\?(?:circ|degree|deg))(?![A-Za-z])", "°", s)
 
     # roots + fractions, innermost first (they nest inside each other)
     frac_re = _re79.compile(r"(?:\\|(?<![A-Za-z]))(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
@@ -248,7 +248,7 @@ def mathify_79(text: str) -> str:
         if new == s:
             break
         s = new
-    s = _re79.sub(r"(?<=[A-Za-z0-9\)\]])_\s*([0-9A-Za-z])", lambda m: _sub_79(m.group(1)), s)
+    s = _re79.sub(r"(?<=[^\s_])_\s*([0-9A-Za-z])(?![A-Za-z0-9])", lambda m: _sub_79(m.group(1)), s)
 
     # degree written as "45°" after ^circ conversion may become "45 °"
     s = s.replace(" °", "°")
