@@ -154,9 +154,11 @@ def _accent_79(s: str) -> str:
     """vec{A}/vec A → A⃗ , hat{i} → î , bar{x} → x̄ , dot{v} → v̇ ."""
     def one(name, mark_fn):
         nonlocal s
-        pat = _re79.compile(r"(?<![A-Za-z])\\?" + name + r"\s*(?:\{([^{}]{1,20})\}|([A-Za-z0-9]))")
+        pat_brace = _re79.compile(r"\\?" + name + r"\s*\{([^{}]{1,20})\}")
+        pat_bare = _re79.compile(r"(?<![A-Za-z])\\?" + name + r"\s*([A-Za-z0-9])(?![A-Za-z])")
         for _ in range(6):
-            new = pat.sub(lambda m: mark_fn((m.group(1) or m.group(2) or "").strip()), s)
+            new = pat_brace.sub(lambda m: mark_fn((m.group(1) or "").strip()), s)
+            new = pat_bare.sub(lambda m: mark_fn((m.group(1) or "").strip()), new)
             if new == s:
                 break
             s = new
@@ -194,27 +196,31 @@ def mathify_79(text: str) -> str:
     # accents (vec / hat / bar / dot)
     s = _accent_79(s)
 
-    # fractions (nested-safe, inner first)
-    frac_re = _re79.compile(r"(?<![A-Za-z])\\?(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
-    for _ in range(8):
-        new = frac_re.sub(lambda m: _wrap_79(m.group(1)) + "/" + _wrap_79(m.group(2)), s)
-        if new == s:
-            break
-        s = new
-    s = _re79.sub(r"(?<![A-Za-z])\\?(?:d|t)?frac\s+([A-Za-z0-9])\s*([A-Za-z0-9])", r"\1/\2", s)
+    # degree written as ^circ / ^{\circ}
+    s = _re79.sub(r"\^\s*\{?\s*\\?(?:circ|degree|deg)\s*\}?", "°", s)
 
-    # roots
+    # roots + fractions, innermost first (they nest inside each other)
+    frac_re = _re79.compile(r"(?<![A-Za-z])\\?(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
     root_re = _re79.compile(r"(?<![A-Za-z])\\?sqrt\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}")
-    for _ in range(6):
+    for _ in range(10):
         new = root_re.sub(
             lambda m: ("∛" if (m.group(1) or "").strip() == "3" else "√") + _wrap_79(m.group(2)), s)
+        new = frac_re.sub(lambda m: _wrap_79(m.group(1)) + "/" + _wrap_79(m.group(2)), new)
         if new == s:
             break
         s = new
     s = _re79.sub(r"(?<![A-Za-z])\\?sqrt\s*([A-Za-z0-9])", r"√\1", s)
+    s = _re79.sub(r"(?<![A-Za-z])\\?(?:d|t)?frac\s+([A-Za-z0-9])\s*([A-Za-z0-9])", r"\1/\2", s)
 
     # trig / log function names keep their name, drop the backslash
     s = _re79.sub(r"\\(sin|cos|tan|cot|sec|csc|log|ln|exp|lim|max|min|arcsin|arccos|arctan)\b", r"\1", s)
+
+    # greek / operator names glued to a preceding word (e.g. "tantheta")
+    _GLUED_79 = ("theta", "alpha", "beta", "gamma", "delta", "lambda", "omega",
+                 "sigma", "phi", "psi", "mu", "pi", "rho", "tau", "circ",
+                 "times", "cdot", "pm", "infty")
+    for _w in _GLUED_79:
+        s = _re79.sub(r"(?<=[a-z])" + _w + r"(?![A-Za-z])", _SYM_79.get(_w, _w), s)
 
     # symbol macros
     def _macro_sub(m):
