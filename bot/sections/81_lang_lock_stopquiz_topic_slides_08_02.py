@@ -55,6 +55,9 @@ _LANG_TOKENS_81 = {
 
 # Active language mode for the running generation job ("en" | "bn" | "mix").
 _active_lang_81 = None
+# True only when the owner typed an explicit language token for this run.
+# Auto-detected languages must never silently drop generated items.
+_explicit_lang_81 = False
 
 
 def _lang_token_81(token):
@@ -168,7 +171,8 @@ def buffer_add(user_id, payload):  # noqa: F811
     data = dict(payload or {})
     lang = globals().get("_active_lang_81")
     generated = str(data.get("source") or "").lower().startswith("gen_")
-    if generated and lang in ("en", "bn") and not _lang_ok_81(data, lang):
+    if (generated and bool(globals().get("_explicit_lang_81"))
+            and lang in ("en", "bn") and not _lang_ok_81(data, lang)):
         _log81("dropped off-language (%s) generated item" % lang, "warning")
         return None
     return _prev_buffer_add_81(user_id, data)
@@ -192,10 +196,17 @@ def _wrap_lang_command_81(name):
             if lang:
                 context.args = cleaned
         globals()["_active_lang_81"] = lang
+        globals()["_explicit_lang_81"] = bool(lang)
+        # A new explicit generation command always cancels any stale stop flag,
+        # otherwise an earlier /stopquiz would silently zero every later run.
+        with _cx81.suppress(Exception):
+            _stop_clear_81(update.effective_user.id if update.effective_user else None)
+            _stop_clear_81(None)
         try:
             return await _previous(update, context)
         finally:
             globals()["_active_lang_81"] = None
+            globals()["_explicit_lang_81"] = False
 
     globals()[name] = wrapper
     _log81("language lock installed on %s" % name)
@@ -214,7 +225,9 @@ _STOP_81 = {"users": {}, "all_until": 0.0}
 
 def _stop_request_81(user_id):
     _STOP_81["users"][int(user_id)] = _time81.time()
-    _STOP_81["all_until"] = _time81.time() + 900.0
+    # Short window: it only has to interrupt the run that is in flight.  A long
+    # window used to silently zero every later .gen/.aiq round.
+    _STOP_81["all_until"] = _time81.time() + 25.0
 
 
 def _stop_clear_81(user_id=None):
@@ -287,6 +300,18 @@ if callable(_prev_gen_buffer_81):
     async def _generate_to_buffer_59(update, context, ocr_ctx, uid, count, mode="std"):  # noqa: F811
         if _stop_active_81(uid):
             _log81("generation round skipped — stop requested")
+            _stop_clear_81(uid)
+            _stop_clear_81(None)
+            with _cx81.suppress(Exception):
+                await update.effective_message.reply_text(
+                    ui_box_html(  # type: ignore[name-defined]
+                        "Stopped",
+                        "আগের <code>/stopquiz</code> এখনো সক্রিয় ছিল, তাই এই রাউন্ড বাদ গেল।\n"
+                        "Stop flag এখন সরানো হয়েছে — কমান্ডটি আবার দাও।",
+                        emoji="⏹",
+                    ),
+                    parse_mode=ParseMode.HTML,  # type: ignore[name-defined]
+                )
             return 0, 0
         return await _prev_gen_buffer_81(update, context, ocr_ctx, uid, count, mode)
 
