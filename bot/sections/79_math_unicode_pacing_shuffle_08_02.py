@@ -190,6 +190,9 @@ def mathify_79(text: str) -> str:
     s = _re79.sub(r"\\\[(.+?)\\\]", r"\1", s, flags=_re79.S)
     s = _re79.sub(r"\$\$(.+?)\$\$", r"\1", s, flags=_re79.S)
     s = _re79.sub(r"\$([^$\n]+?)\$", r"\1", s)
+    s = _re79.sub(r"\\\\", "\n", s)
+    # every macro is handled bare below, so drop the escaping backslash once
+    s = _re79.sub(r"\\(?=[A-Za-z])", "", s)
     s = _re79.sub(r"(?<![A-Za-z])\\?(?:displaystyle|limits|nolimits)\b", "", s)
     s = _re79.sub(r"(?<![A-Za-z])\\?(?:left|right)\s*(?=[\(\)\[\]\|\.\{\}])", "", s)
     s = _re79.sub(r"(?<![A-Za-z])\\?(?:text|mathrm|mathbf|textbf|textit|mathit|operatorname)\s*\{([^{}]*)\}", r"\1", s)
@@ -228,6 +231,11 @@ def mathify_79(text: str) -> str:
         name = m.group(1)
         return _SYM_79.get(name, m.group(0))
     s = _MACRO_RE_79.sub(_macro_sub, s)
+
+    # names glued directly to an uppercase symbol / bracket (e.g. "cdotB")
+    _GLUE2_79 = sorted(_SYM_79.keys(), key=len, reverse=True)
+    _glue2_re = _re79.compile(r"(?<![A-Za-z])(" + "|".join(_GLUE2_79) + r")(?=[A-Z0-9\(\[])")
+    s = _glue2_re.sub(lambda m: _SYM_79.get(m.group(1), m.group(0)), s)
 
     # ^{...} / ^x  and _{...} / _x
     sup_re = _re79.compile(r"\^\s*\{([^{}]{1,12})\}")
