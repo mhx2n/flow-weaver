@@ -330,7 +330,48 @@ def _rich_text_parts_79(text: str):
         parts.append(source[pos:])
     if not parts:
         parts = [source]
-    return [part for part in parts if part != ""]
+
+    # OCR/older sanitisers sometimes remove the dollar fences and even the
+    # leading backslash (``frac{a}{b}``).  Split formula-looking ASCII runs
+    # from Bengali prose and promote only runs that contain real math syntax.
+    promoted = []
+    candidate_rx = _re79.compile(
+        r"[A-Za-z0-9\\{}\[\]()^_=+\-*/|.,:;<>√∫∑∏≤≥≠±∞π∂θ×÷⇒→°\s]{3,}"
+    )
+
+    def _looks_formula_run(run: str) -> bool:
+        compact = run.strip()
+        if len(compact) < 2:
+            return False
+        macro_hit = _re79.search(
+            r"(?:\\)?(?:frac|sqrt|int|sum|prod|lim|sin|cos|tan|log|ln|vec|hat|"
+            r"theta|alpha|beta|gamma|pi|pm|times|cdot|Rightarrow)\b", compact
+        )
+        operator_hit = _re79.search(r"[=^_√∫∑∏≤≥≠±∞×÷]|\d\s*[/+*\-]\s*[A-Za-z0-9(]", compact)
+        return bool(macro_hit or operator_hit)
+
+    for part in parts:
+        if not isinstance(part, str):
+            promoted.append(part)
+            continue
+        cursor = 0
+        for match in candidate_rx.finditer(part):
+            run = match.group(0)
+            if not _looks_formula_run(run):
+                continue
+            leading = len(run) - len(run.lstrip())
+            trailing = len(run) - len(run.rstrip())
+            start = match.start() + leading
+            end = match.end() - trailing
+            if start > cursor:
+                promoted.append(part[cursor:start])
+            expression = _repair_latex_source_79(part[start:end])
+            if expression:
+                promoted.append({"type": "mathematical_expression", "expression": expression})
+            cursor = end
+        if cursor < len(part):
+            promoted.append(part[cursor:])
+    return [part for part in promoted if part != ""]
 
 
 def _rich_math_blocks_79(question: str, options, lang: str = "bn"):
