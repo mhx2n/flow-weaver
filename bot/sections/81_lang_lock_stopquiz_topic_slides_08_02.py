@@ -583,8 +583,9 @@ if callable(_prev_cb_aitopic_81):
         owner_id = int(getattr(update.effective_user, "id", 0) or 0)
         action = ""
         with _cx81.suppress(Exception):
-            action = (_re81.fullmatch(r"ait80:(send|pin|cancel):(\d+)", query.data or "") or
-                      _re81).group(1) if query else ""
+            matched = _re81.fullmatch(r"ait80:(send|pin|cancel):(\d+)",
+                                      (query.data or "") if query else "")
+            action = matched.group(1) if matched else ""
         if action not in ("send", "pin") or not _is_owner_81(owner_id):
             return await _prev_cb_aitopic_81(update, context)
 
