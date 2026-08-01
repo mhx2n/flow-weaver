@@ -159,3 +159,19 @@ Owner commands: `/rich on|off|status` and `/richdemo`.
   backslash-stripped LaTeX (`vec{A}`, `hat{i}`, `frac{5}{sqrt{2}}`,
   `90^circ`, `Rightarrow`) into clean professional math: `A⃗`, `î`, `5/√2`,
   `90°`, `⇒`.
+
+## Section 81 — language lock, stop control, topic slideshow (2026-08-02)
+
+- **Language lock:** `.aiq`/`.gen` accept a language token — `en|english|ইংরেজি`
+  (English-only), `bn|bangla|বাংলা` (Bangla-only), `std|standard|mixed`
+  (professional mix). No token → detected from the source script. Enforced in
+  the AI prompt *and* by dropping off-language generated items.
+  Example: `.aiq buet en 50`, `.gen med bn 30`, `.aiq board standard 40`.
+- **Stop control:** `/stopquiz` (`.stopquiz`) halts an ongoing posting or
+  generation run after the current quiz; `/resumequiz` clears the flag.
+- **Topic slideshow:** `.topicimg top|bottom <urls…>` or reply to a photo with
+  `.topicimg top` to attach a reviewable image slideshow above/below the AI
+  rich topic. `.topicimg clear` removes it. Slides are sent with the topic on
+  Confirm / Send & Pin.
+- **Command visibility:** all new commands are added to the owner "/" menu, and
+  `/allcmds` sends the complete registered command list to the owner inbox.
