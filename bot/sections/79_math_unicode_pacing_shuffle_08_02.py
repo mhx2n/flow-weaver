@@ -183,7 +183,7 @@ def mathify_79(text: str) -> str:
     if not s:
         return s
     s = s.replace("\r", "")
-    s = _re79.sub(r"\\{2,}(?=[A-Za-z])", "\\", s)
+    s = _re79.sub(r"\\{2,}(?=[A-Za-z])", lambda _m: "\\", s)
 
     # delimiters
     s = _re79.sub(r"\\\((.+?)\\\)", r"\1", s, flags=_re79.S)
