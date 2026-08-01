@@ -192,3 +192,16 @@ Owner commands: `/rich on|off|status` and `/richdemo`.
   cannot, the anchor is still saved and you get a warning to make the bot admin.
 - **`.topicinfo`** shows the active anchor (chat, post id, link).
   **`.topicoff`** removes it. Linked posts are also stored in `.mytopics`.
+
+## Section 83 — safe math cards + rich text for users (2026-08-02)
+
+- Math rich cards never show a half formula: a LaTeX run is sent as a native
+  `mathematical_expression` block only when it is complete and balanced;
+  anything else is rendered as clean Unicode math text (nothing is trimmed).
+- Truncated poll stems are recovered from the raw item registry, so the card
+  always carries the full question plus every option.
+- Math items now follow the selected language (`en` / `bn` / standard): the
+  stem prose is written in that language and formulas stay inside `$...$`.
+- Every user-facing AI/OCR answer is delivered as a native rich message
+  (real math, tables, headings) with the classic HTML path as a silent
+  fallback, so users never see a formatting error.
