@@ -350,6 +350,58 @@ async def rich_send_77(bot, chat_id, text, *, parse_mode=None, reply_to=None,
     return _RichSentMessage77(bot, chat_id, mid, text)
 
 
+async def rich_send_blocks_77(bot, chat_id, blocks, *, reply_to=None,
+                              thread_id=None, silent=False, reply_markup=None):
+    """Send validated Bot API rich blocks without involving Telethon.
+
+    This is the reliable path for mathematical expressions: each formula is
+    explicitly marked as ``mathematical_expression`` instead of hoping the
+    Markdown parser can recover LaTeX from already-sanitised quiz text.
+    Returns a PTB-compatible shim, or ``None`` so callers can use their normal
+    HTML/plain-text fallback.  Content errors do not disable rich transport.
+    """
+    if not _BOT_TOKEN_77 or not isinstance(blocks, list) or not blocks:
+        return None
+    payload = {
+        "chat_id": chat_id,
+        "rich_message": {"blocks": blocks},
+        "disable_notification": bool(silent),
+    }
+    if thread_id:
+        payload["message_thread_id"] = _int77(thread_id)
+    if reply_to:
+        payload["reply_parameters"] = {"message_id": _int77(reply_to)}
+    if reply_markup is not None:
+        with _cx77.suppress(Exception):
+            payload["reply_markup"] = reply_markup.to_dict()
+
+    def _send_blocks():
+        return _requests77.post(
+            f"https://api.telegram.org/bot{_BOT_TOKEN_77}/sendRichMessage",
+            json=payload,
+            timeout=20,
+        )
+
+    try:
+        response = await _a77.wait_for(_a77.to_thread(_send_blocks), timeout=22.0)
+        data = response.json()
+        if response.ok and data.get("ok"):
+            mid = _int77((data.get("result") or {}).get("message_id"))
+            if mid:
+                _RICH77.note_ok()
+                return _RichSentMessage77(bot, chat_id, mid, "")
+        # Keep the exact Bot API reason in logs/status, but don't trip the
+        # global circuit breaker for one malformed question.
+        _RICH77.sent_fail += 1
+        _RICH77.last_error = f"Bot API {response.status_code}: {str(data)[:300]}"
+        _log77("rich blocks rejected: %s" % _RICH77.last_error)
+    except Exception as e:
+        _RICH77.sent_fail += 1
+        _RICH77.last_error = f"Bot API rich blocks: {e}"[:300]
+        _log77(_RICH77.last_error)
+    return None
+
+
 async def rich_edit_77(chat_id, message_id, text, *, parse_mode=None):
     """Edit an existing message into a native rich message. True on success."""
     client = await _get_client_77()
