@@ -276,6 +276,7 @@ async def cmd_aiq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ocr_ctx = {"clean_text": topic, "raw_markdown": topic, "items": [], "source_label": "text"}
     globals()["_active_std_78"] = std
     total_added = total_dup = 0
+    failure_reason = ""
     try:
         remaining = int(count)
         rounds = 0
@@ -288,6 +289,8 @@ async def cmd_aiq(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 added, dup = 0, 0
             total_added += int(added or 0)
             total_dup += int(dup or 0)
+            if not added:
+                failure_reason = str(context.user_data.get("_last_gen_error_74") or "").strip()
             remaining -= chunk
             rounds += 1
             if not added:
@@ -315,6 +318,8 @@ async def cmd_aiq(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Duplicates skipped: <code>{total_dup}</code>\n"
             f"Buffered total: <code>{buffer_count(uid)}</code>"  # type: ignore[name-defined]
         )
+        if not total_added and failure_reason:
+            body += f"\nReason: <code>{h(failure_reason)}</code>"  # type: ignore[name-defined]
         if status:
             await status.edit_text(
                 ui_box_html("Text → Quiz Buffer" if total_added else "Generation Failed", body, emoji="✅" if total_added else "⚠️"),  # type: ignore[name-defined]
