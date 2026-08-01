@@ -225,7 +225,9 @@ _STOP_81 = {"users": {}, "all_until": 0.0}
 
 def _stop_request_81(user_id):
     _STOP_81["users"][int(user_id)] = _time81.time()
-    _STOP_81["all_until"] = _time81.time() + 900.0
+    # Short window: it only has to interrupt the run that is in flight.  A long
+    # window used to silently zero every later .gen/.aiq round.
+    _STOP_81["all_until"] = _time81.time() + 25.0
 
 
 def _stop_clear_81(user_id=None):
@@ -298,6 +300,18 @@ if callable(_prev_gen_buffer_81):
     async def _generate_to_buffer_59(update, context, ocr_ctx, uid, count, mode="std"):  # noqa: F811
         if _stop_active_81(uid):
             _log81("generation round skipped — stop requested")
+            _stop_clear_81(uid)
+            _stop_clear_81(None)
+            with _cx81.suppress(Exception):
+                await update.effective_message.reply_text(
+                    ui_box_html(  # type: ignore[name-defined]
+                        "Stopped",
+                        "আগের <code>/stopquiz</code> এখনো সক্রিয় ছিল, তাই এই রাউন্ড বাদ গেল।\n"
+                        "Stop flag এখন সরানো হয়েছে — কমান্ডটি আবার দাও।",
+                        emoji="⏹",
+                    ),
+                    parse_mode=ParseMode.HTML,  # type: ignore[name-defined]
+                )
             return 0, 0
         return await _prev_gen_buffer_81(update, context, ocr_ctx, uid, count, mode)
 
