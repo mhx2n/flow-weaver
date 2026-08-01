@@ -560,30 +560,42 @@ async def cb_aitopic_80(update, context):
     chat_id, title, thread_id = target
     await query.answer("Sending…")
     sent = None
-    sender = globals().get("rich_send_77")
-    if callable(sender):
-        with _cx80.suppress(Exception):
-            sent = await sender(context.bot, chat_id, row["draft_text"], thread_id=thread_id)
-    if sent is None:
-        kwargs = {"chat_id": chat_id, "text": row["draft_text"][:4000]}
-        if thread_id is not None:
-            kwargs["message_thread_id"] = thread_id
-        sent = await context.bot.send_message(**kwargs)
+    try:
+        sender = globals().get("rich_send_77")
+        if callable(sender):
+            with _cx80.suppress(Exception):
+                sent = await sender(context.bot, chat_id, row["draft_text"], thread_id=thread_id)
+        if sent is None:
+            kwargs = {"chat_id": chat_id, "text": row["draft_text"][:4000]}
+            if thread_id is not None:
+                kwargs["message_thread_id"] = thread_id
+            sent = await context.bot.send_message(**kwargs)
+    except Exception as error:
+        _log80("AI topic delivery failed: %s" % error, "warning")
+        await query.answer("Topic পাঠানো যায়নি—draft রাখা হয়েছে। আবার চেষ্টা করুন।", show_alert=True)
+        return
+    if sent is None or not getattr(sent, "message_id", None):
+        await query.answer("Topic delivery নিশ্চিত করা যায়নি—draft রাখা হয়েছে।", show_alert=True)
+        return
     should_pin = action == "pin" or bool(row.get("do_pin"))
+    pinned = False
     if should_pin:
-        with _cx80.suppress(Exception):
+        try:
             await context.bot.pin_chat_message(chat_id=chat_id, message_id=sent.message_id,
                                                disable_notification=True)
-    _set_topic_anchor(owner_id, chat_id, sent.message_id)  # type: ignore[name-defined]
+            pinned = True
+        except Exception as error:
+            _log80("AI topic pin failed: %s" % error, "warning")
+    _set_topic_anchor(owner_id, chat_id, sent.message_id, row["draft_text"])  # type: ignore[name-defined]
     name = _re80.sub(r"[*_`#]", "", str(row["draft_text"])).strip().split("\n", 1)[0][:50] or "AI Topic"
     with _cx80.suppress(Exception):
-        _sta_save(owner_id, name, chat_id, sent.message_id)  # type: ignore[name-defined]
+        _sta_save(owner_id, name, chat_id, sent.message_id, row["draft_text"])  # type: ignore[name-defined]
     _topic_delete_80(owner_id)
     with _cx80.suppress(Exception):
         await query.edit_message_text(
             "✅ <b>AI topic sent</b>\nTarget: <b>%s</b>\nPinned: <b>%s</b>\n\n"
             "পরবর্তী topic তৈরি বা <code>.cleartopic</code> না করা পর্যন্ত quiz-গুলো এটাকেই reply করবে।"
-            % (_html80.escape(title), "Yes" if should_pin else "No"),
+            % (_html80.escape(title), "Yes" if pinned else ("Failed" if should_pin else "No")),
             parse_mode=ParseMode.HTML,  # type: ignore[name-defined]
         )
 
