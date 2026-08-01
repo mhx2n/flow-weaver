@@ -175,3 +175,20 @@ Owner commands: `/rich on|off|status` and `/richdemo`.
   Confirm / Send & Pin.
 - **Command visibility:** all new commands are added to the owner "/" menu, and
   `/allcmds` sends the complete registered command list to the owner inbox.
+
+## Section 82 — post-link topic anchors (2026-08-02)
+
+- **`.linktopic <t.me post link> [| name]`** (aliases `.lt`, `.topiclink`):
+  turn any **existing** channel/group post into the active topic anchor.
+  From then on every posted quiz replies to that post — same-chat as a normal
+  reply, cross-chat via Bot API `ReplyParameters` (a tappable header linking
+  back to the original post; nothing is copied or forwarded).
+  Stays active until a new topic is set (`.aitopic`, `.settopic`) or removed.
+- Supported links: `t.me/c/<id>/<post>`, `t.me/c/<id>/<thread>/<post>`,
+  `t.me/<username>/<post>`, `t.me/<username>/<thread>/<post>` — with or without
+  `https://`, `telegram.me`, and `?comment=`/`#` suffixes are ignored.
+- You can also **reply to a forwarded post** with `.linktopic` (no link needed).
+- The bot copies the target post to your inbox as a verification preview; if it
+  cannot, the anchor is still saved and you get a warning to make the bot admin.
+- **`.topicinfo`** shows the active anchor (chat, post id, link).
+  **`.topicoff`** removes it. Linked posts are also stored in `.mytopics`.
