@@ -137,3 +137,16 @@ Behaviour:
   HTML behaviour (with a 5-minute cooldown so users never see extra latency).
 
 Owner commands: `/rich on|off|status` and `/richdemo`.
+
+## Owner quiz generation (section 78)
+
+- `.aiq [standard] [count] [topic]` — reply to any text/topic message (or pass the
+  topic inline) to generate unlimited MCQs into the buffer, e.g.
+  `.aiq buet 50`, `.aiq dmc 30`, `.aiq board 100`.
+- `.gen med|eng|ver|std` now also accepts an exam standard token:
+  `buet cuet kuet ruet du ju cu ru sust dmc medical dental gst board hsc ssc bcs`.
+- Math MCQs are posted in two messages: a native rich-text card with the full
+  question + options (LaTeX preserved), followed by a quiz poll asking
+  "উপরের প্রশ্নের সঠিক উত্তর কোনটি?" with label-only options.
+- `/qver bn|en` — poll language/labels (ক খ গ ঘ vs A B C D).
+- `/mathpost on|off` — toggle the math two-message format.
