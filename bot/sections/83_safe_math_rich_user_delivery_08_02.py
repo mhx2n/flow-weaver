@@ -246,7 +246,7 @@ def _repair_stem_83(question: str) -> str:
             q = q + ("}" * braces)
         if q.count("$") % 2:
             q = q + "$"
-        q = _re83.sub(r"^[)\]}|,;+*/=\s]+", "", q)
+        q = _re83.sub(r"^[)\]}|,;+*/=\s\u00b2\u00b3\u00b9\u2212\-]+", "", q)
     return q.strip()
 
 
