@@ -29,6 +29,7 @@ import html as _html77
 import os as _os77
 import re as _re77
 import time as _t77
+import requests as _requests77
 
 
 def _log77(msg):
@@ -57,7 +58,9 @@ class _RichState77:
     """Runtime state for the MTProto rich transport."""
 
     def __init__(self):
-        self.enabled = bool(_API_ID_77 and _API_HASH_77 and _BOT_TOKEN_77 and not _RICH_ENV_OFF_77)
+        # Bot API 10.1 has a first-class sendRichMessage method. It only needs
+        # the bot token; API_ID/API_HASH are retained for the MTProto fallback.
+        self.enabled = bool(_BOT_TOKEN_77 and not _RICH_ENV_OFF_77)
         self.client = None
         self.lock = _a77.Lock()
         self.fail_streak = 0
@@ -266,7 +269,45 @@ class _RichSentMessage77:
 # ── Core senders ──────────────────────────────────────────────────────────────
 async def rich_send_77(bot, chat_id, text, *, parse_mode=None, reply_to=None,
                        thread_id=None, silent=False, no_webpage=True):
-    """Send a native rich message. Returns _RichSentMessage77 or None."""
+    """Send a native rich message through Bot API 10.1, then MTProto fallback."""
+    rich, plain = _rich_payload_77(text, parse_mode) if _TELETHON_OK_77 else (None, _strip_tags_77(text))
+    source = str(text or "")
+    pm = str(parse_mode or "").lower()
+    rich_body = {"html": source} if ("html" in pm or _re77.search(r"<(b|i|u|s|a|code|pre|blockquote|tg-spoiler)\b", source, _re77.I)) else {"markdown": source}
+    payload = {
+        "chat_id": chat_id,
+        "rich_message": rich_body,
+        "disable_notification": bool(silent),
+    }
+    if thread_id:
+        payload["message_thread_id"] = _int77(thread_id)
+    if reply_to:
+        payload["reply_parameters"] = {"message_id": _int77(reply_to)}
+
+    def _bot_api_send():
+        return _requests77.post(
+            f"https://api.telegram.org/bot{_BOT_TOKEN_77}/sendRichMessage",
+            json=payload,
+            timeout=20,
+        )
+
+    if _RICH77.ready():
+        try:
+            response = await _a77.wait_for(_a77.to_thread(_bot_api_send), timeout=22.0)
+            data = response.json()
+            if response.ok and data.get("ok"):
+                mid = _int77((data.get("result") or {}).get("message_id"))
+                if mid:
+                    _RICH77.note_ok()
+                    return _RichSentMessage77(bot, chat_id, mid, text)
+            _RICH77.note_fail(f"Bot API {response.status_code}: {str(data)[:240]}")
+        except Exception as e:
+            _RICH77.note_fail(f"Bot API sendRichMessage: {e}")
+
+    # Compatibility fallback for deployments where Telegram has not exposed
+    # Bot API 10.1 yet. This path needs API_ID/API_HASH and a recent Telethon.
+    if not (_API_ID_77 and _API_HASH_77 and _TELETHON_OK_77):
+        return None
     client = await _get_client_77()
     if client is None:
         return None
@@ -488,8 +529,8 @@ async def cmd_rich_77(update, context):
         return
     arg = (context.args[0].strip().lower() if getattr(context, "args", None) else "status")
     if arg in ("on", "enable"):
-        if not (_API_ID_77 and _API_HASH_77 and _TELETHON_OK_77):
-            await m.reply_text("Cannot enable: TELEGRAM_API_ID / TELEGRAM_API_HASH or telethon missing.")
+        if not _BOT_TOKEN_77:
+            await m.reply_text("Cannot enable: BOT_TOKEN is missing.")
             return
         _RICH77.enabled = True
         _RICH77.cooldown_until = 0.0
@@ -502,8 +543,8 @@ async def cmd_rich_77(update, context):
     cd = max(0, int(_RICH77.cooldown_until - _t77.time()))
     await m.reply_text(
         "Rich text status\n"
-        f"• transport: Telethon MTProto ({'available' if _TELETHON_OK_77 else 'missing'})\n"
-        f"• api credentials: {'set' if (_API_ID_77 and _API_HASH_77) else 'missing'}\n"
+        "• primary transport: Official Bot API sendRichMessage\n"
+        f"• MTProto fallback: {'available' if (_API_ID_77 and _API_HASH_77 and _TELETHON_OK_77) else 'unavailable'}\n"
         f"• enabled: {_RICH77.enabled}\n"
         f"• cooldown: {cd}s\n"
         f"• sent ok / fallback: {_RICH77.sent_ok} / {_RICH77.sent_fail}\n"

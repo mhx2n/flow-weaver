@@ -291,6 +291,7 @@ def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoi
     rows = []
     with _cx74.suppress(Exception):
         rows = sorted(list(_adv_load() or []), key=_provider_sort_key_74)  # type: ignore[name-defined]
+    enabled_rows = [row for row in rows if row.get("enabled")]
 
     # _adv_call_text stops at the first non-empty response.  That is correct for
     # normal chat, but wrong for quiz generation: a provider can return prose or
@@ -299,7 +300,7 @@ def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoi
     # found.  The cap keeps worst-case latency bounded.
     attempted = 0
     last_error = ""
-    for prov in rows:
+    for prov in enabled_rows:
         if not prov.get("enabled") or attempted >= 5:
             continue
         age = _time74.time() - float(prov.get("last_error_ts") or 0)
@@ -340,6 +341,9 @@ def _generate_batch_fast_74(source_text, need, *, easy=0, medium=0, hard=0, avoi
                 return out
         except Exception as e:
             last_error = str(e)
+
+    if not enabled_rows and not last_error:
+        last_error = "No AI provider is configured. Add one with /advmode or add a Gemini key with /gemini."
 
     with _cx74.suppress(Exception):
         db_log("WARN", "fast_gen_all_invalid_74", {  # type: ignore[name-defined]
@@ -419,12 +423,14 @@ async def _generate_to_buffer_59(update, context, ocr_ctx, uid, count, mode="std
     count = max(1, min(500, int(count or 20)))
     globals()["_active_gen_mode_57"] = mode or "std"
     try:
+        context.user_data.pop("_last_gen_error_74", None)
         items = await _run_blocking(  # type: ignore[name-defined]
             _role_of(uid), _generate_quizzes_from_ocr_sync,  # type: ignore[name-defined]
             ocr_ctx, count, uid, timeout=max(35, min(160, count * 4)),
         )
     except Exception as e:
         db_log("WARN", "direct_gen_failed_74", {"user_id": int(uid), "error": str(e)[:200]})  # type: ignore[name-defined]
+        context.user_data["_last_gen_error_74"] = str(e)[:300]
         items = []
     finally:
         globals()["_active_gen_mode_57"] = None
