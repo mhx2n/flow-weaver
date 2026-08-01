@@ -55,6 +55,9 @@ _LANG_TOKENS_81 = {
 
 # Active language mode for the running generation job ("en" | "bn" | "mix").
 _active_lang_81 = None
+# True only when the owner typed an explicit language token for this run.
+# Auto-detected languages must never silently drop generated items.
+_explicit_lang_81 = False
 
 
 def _lang_token_81(token):
@@ -168,7 +171,8 @@ def buffer_add(user_id, payload):  # noqa: F811
     data = dict(payload or {})
     lang = globals().get("_active_lang_81")
     generated = str(data.get("source") or "").lower().startswith("gen_")
-    if generated and lang in ("en", "bn") and not _lang_ok_81(data, lang):
+    if (generated and bool(globals().get("_explicit_lang_81"))
+            and lang in ("en", "bn") and not _lang_ok_81(data, lang)):
         _log81("dropped off-language (%s) generated item" % lang, "warning")
         return None
     return _prev_buffer_add_81(user_id, data)
@@ -192,10 +196,17 @@ def _wrap_lang_command_81(name):
             if lang:
                 context.args = cleaned
         globals()["_active_lang_81"] = lang
+        globals()["_explicit_lang_81"] = bool(lang)
+        # A new explicit generation command always cancels any stale stop flag,
+        # otherwise an earlier /stopquiz would silently zero every later run.
+        with _cx81.suppress(Exception):
+            _stop_clear_81(update.effective_user.id if update.effective_user else None)
+            _stop_clear_81(None)
         try:
             return await _previous(update, context)
         finally:
             globals()["_active_lang_81"] = None
+            globals()["_explicit_lang_81"] = False
 
     globals()[name] = wrapper
     _log81("language lock installed on %s" % name)
