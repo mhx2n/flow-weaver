@@ -147,7 +147,7 @@ def _wrap_79(s: str) -> str:
     return t
 
 
-_MACRO_RE_79 = _re79.compile(r"(?:\\|(?<![A-Za-z]))([A-Za-z]{2,12})\b")
+_MACRO_RE_79 = _re79.compile(r"(?:\\|(?<![A-Za-z]))([A-Za-z]{2,12})(?![A-Za-z])")
 
 
 def _accent_79(s: str) -> str:
@@ -262,6 +262,7 @@ def mathify_79(text: str) -> str:
     s = _re79.sub(r"\\[,;:!]", " ", s)
     s = _re79.sub(r"\\\\", "\n", s)
     s = _re79.sub(r"\\(?=[A-Za-z])", "", s)
+    s = _re79.sub(r"\\(?=[^A-Za-z\s])", "", s)
     s = _re79.sub(r"[ \t]{2,}", " ", s)
     s = _re79.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
