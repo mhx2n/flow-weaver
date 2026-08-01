@@ -55,6 +55,8 @@ def _strip_greeting_85(text: str) -> str:
         cleaned = _BAD_GREETING_RX_85.sub("", line)
         # drop the leftover punctuation of the greeting clause
         cleaned = _re85.sub(r"^[\s!,\.।;:\-–—…\u0964]+", "", cleaned)
+        # a greeting removed from mid-line can leave stray punctuation behind
+        cleaned = _re85.sub(r"([।!\.:;])\s*[,;!]+\s*", r"\1 ", cleaned)
         cleaned = _re85.sub(r"\s{2,}", " ", cleaned).strip()
         if cleaned in {"!", ".", "।", ","}:
             cleaned = ""
