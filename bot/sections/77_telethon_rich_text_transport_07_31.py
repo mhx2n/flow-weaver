@@ -103,8 +103,8 @@ except Exception as _e:  # telethon missing → transparent no-op
     _TELETHON_OK_77 = False
     _log77("telethon unavailable (%s) — rich transport disabled, bot unaffected." % _e)
 
-if not _TELETHON_OK_77:
-    _RICH77.enabled = False
+# Official Bot API 10.1 rich messages do not depend on Telethon. A missing or
+# older Telethon installation only disables the secondary MTProto fallback.
 
 
 async def _get_client_77():
