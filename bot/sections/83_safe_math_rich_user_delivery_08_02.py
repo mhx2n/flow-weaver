@@ -237,16 +237,10 @@ def _repair_stem_83(question: str) -> str:
     if full and (len(full) > len(q) or (_stem_looks_cut_83(q) and not _stem_looks_cut_83(full))):
         q = full
     if _stem_looks_cut_83(q):
-        # 1) drop the mid-formula prefix a truncated stem starts with
-        q = _re83.sub(r"^[)\]}|,;+*/=\s\u00b2\u00b3\u00b9\u2212\-]+", "", q)
-        for _ in range(6):
-            if q.count(")") <= q.count("(") and q.count("}") <= q.count("{"):
-                break
-            cut = min([p for p in (q.find(")"), q.find("}")) if p >= 0] or [-1])
-            if cut < 0:
-                break
-            q = _re83.sub(r"^[^A-Za-z\u0980-\u09FF]+", "", q[cut + 1:])
-        # 2) close whatever the source left open so the renderer stays valid
+        # Never delete content from a stem — a half question is better shown in
+        # full as plain text than silently trimmed.  Only close what the source
+        # left open so the renderer always receives valid input; unbalanced
+        # leftovers stay plain text (the splitter refuses to render them as math).
         opens = q.count("(") - q.count(")")
         if opens > 0:
             q = q + (")" * opens)
