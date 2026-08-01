@@ -354,6 +354,12 @@ def _slides_db_init_81():
 
 _slides_db_init_81()
 
+# Telegram delivers every photo in an album as a separate update.  Keep a
+# short owner/media-group cache so replying to any one album item can attach
+# the complete album instead of only the visible replied photo.
+_ALBUM_BUF_81 = globals().setdefault("_ALBUM_BUF_81", {})
+_COMPOSITE_SENT_81 = globals().setdefault("_COMPOSITE_SENT_81", set())
+
 
 def _slides_get_81(owner_id):
     position, urls = "top", []
@@ -421,6 +427,28 @@ async def _photo_urls_from_message_81(context, message):
     return urls
 
 
+async def _capture_album_photo_81(update, context):
+    message = getattr(update, "message", None)
+    user = getattr(update, "effective_user", None)
+    group_id = str(getattr(message, "media_group_id", "") or "")
+    if not message or not user or not group_id or not _is_owner_81(user.id):
+        return
+    urls = await _photo_urls_from_message_81(context, message)
+    if not urls:
+        return
+    key = (int(user.id), group_id)
+    record = _ALBUM_BUF_81.setdefault(key, {"urls": [], "at": _time81.time()})
+    record["at"] = _time81.time()
+    for url in urls:
+        if url not in record["urls"]:
+            record["urls"].append(url)
+    # Bound memory and remove stale albums opportunistically.
+    cutoff = _time81.time() - 1800
+    for old_key, old in list(_ALBUM_BUF_81.items()):
+        if float(old.get("at") or 0) < cutoff:
+            _ALBUM_BUF_81.pop(old_key, None)
+
+
 async def _send_slideshow_81(context, chat_id, urls, thread_id=None, reply_to=None):
     """Native MTProto slideshow; falls back to a Bot API media group."""
     urls = [str(value) for value in (urls or []) if str(value or "").strip()][:10]
@@ -473,7 +501,7 @@ async def _send_slideshow_81(context, chat_id, urls, thread_id=None, reply_to=No
                         )
                 result = await client(_fn81.messages.SendMessageRequest(
                     peer=peer,
-                    message="",
+                    message="topic slideshow",
                     random_id=_hp81.generate_random_long(),
                     rich_message=rich,
                     no_webpage=True,
@@ -509,6 +537,109 @@ async def _send_slideshow_81(context, chat_id, urls, thread_id=None, reply_to=No
     return None
 
 
+def _topic_text_blocks_81(markdown):
+    """Small safe Markdown→PageBlock converter for a combined topic+slides post."""
+    from telethon import types as _ty81
+
+    def rich_text(value):
+        source = str(value or "").strip()
+        pieces = []
+        cursor = 0
+        token = _re81.compile(r"\$\$([\s\S]+?)\$\$|(?<!\$)\$([^$\n]+?)\$(?!\$)|\*\*(.+?)\*\*")
+        for match in token.finditer(source):
+            if match.start() > cursor:
+                pieces.append(_ty81.TextPlain(text=source[cursor:match.start()]))
+            if match.group(1) or match.group(2):
+                pieces.append(_ty81.TextMath(source=str(match.group(1) or match.group(2)).strip()))
+            else:
+                pieces.append(_ty81.TextBold(text=_ty81.TextPlain(text=match.group(3))))
+            cursor = match.end()
+        if cursor < len(source):
+            pieces.append(_ty81.TextPlain(text=source[cursor:]))
+        if not pieces:
+            return _ty81.TextPlain(text=source or " ")
+        return pieces[0] if len(pieces) == 1 else _ty81.TextConcat(texts=pieces)
+
+    blocks = []
+    for raw in str(markdown or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("# "):
+            blocks.append(_ty81.PageBlockTitle(text=rich_text(line[2:])))
+        elif line.startswith("## "):
+            blocks.append(_ty81.PageBlockHeader(text=rich_text(line[3:])))
+        elif line.startswith("### "):
+            blocks.append(_ty81.PageBlockSubheader(text=rich_text(line[4:])))
+        elif line.startswith("$$") and line.endswith("$$") and len(line) > 4:
+            blocks.append(_ty81.PageBlockMath(source=line[2:-2].strip()))
+        else:
+            blocks.append(_ty81.PageBlockParagraph(text=rich_text(line)))
+    return blocks
+
+
+async def _send_topic_composite_81(context, owner_id, chat_id, text, thread_id=None):
+    """Send text and slideshow as one native rich message; return PTB-like shim."""
+    position, urls = _slides_get_81(owner_id)
+    if not urls:
+        return None
+    client_getter = globals().get("_get_client_77")
+    peer_builder = globals().get("_peer_77")
+    if not (callable(client_getter) and callable(peer_builder) and globals().get("_TELETHON_OK_77")):
+        return None
+    try:
+        import io as _io81
+        import urllib.request as _url81
+        from telethon import functions as _fn81, types as _ty81, helpers as _hp81
+
+        client = await client_getter()
+        peer = peer_builder(chat_id)
+        if client is None or peer is None:
+            return None
+
+        def fetch(url):
+            return _url81.urlopen(url, timeout=25).read()
+
+        photos, items = [], []
+        for index, url in enumerate(urls[:10]):
+            data = await _a81.to_thread(fetch, url)
+            handle = await client.upload_file(_io81.BytesIO(data), file_name="topic-%02d.jpg" % index)
+            uploaded = await client(_fn81.messages.UploadMediaRequest(
+                peer=peer, media=_ty81.InputMediaUploadedPhoto(file=handle)))
+            photo = uploaded.photo
+            input_photo = _ty81.InputPhoto(
+                id=photo.id, access_hash=photo.access_hash, file_reference=photo.file_reference)
+            photos.append(input_photo)
+            items.append(_ty81.PageBlockPhoto(
+                photo_id=input_photo.id,
+                caption=_ty81.PageCaption(text=_ty81.TextEmpty(), credit=_ty81.TextEmpty()),
+            ))
+        slide = _ty81.PageBlockSlideshow(
+            items=items, caption=_ty81.PageCaption(text=_ty81.TextEmpty(), credit=_ty81.TextEmpty()))
+        text_blocks = _topic_text_blocks_81(text)
+        blocks = ([slide] + text_blocks) if position == "top" else (text_blocks + [slide])
+        rich = _ty81.InputRichMessage(blocks=blocks, photos=photos)
+        kwargs = {}
+        if thread_id:
+            kwargs["reply_to"] = _ty81.InputReplyToMessage(
+                reply_to_msg_id=int(thread_id), top_msg_id=int(thread_id))
+        result = await client(_fn81.messages.SendMessageRequest(
+            peer=peer, message="rich topic", random_id=_hp81.generate_random_long(),
+            rich_message=rich, no_webpage=True, **kwargs))
+        extractor = globals().get("_msg_id_from_updates_77")
+        message_id = extractor(result) if callable(extractor) else 0
+        shim = globals().get("_RichSentMessage77")
+        if message_id and shim:
+            _COMPOSITE_SENT_81.add(int(owner_id))
+            return shim(context.bot, chat_id, message_id, text)
+    except Exception as error:
+        _log81("combined topic/slideshow failed: %s" % error, "warning")
+    return None
+
+
+globals()["_send_topic_composite_81"] = _send_topic_composite_81
+
+
 with _cx81.suppress(Exception):
     from telegram import InputMediaPhoto as InputMediaPhoto_81  # noqa: F401
     globals()["InputMediaPhoto_81"] = InputMediaPhoto_81
@@ -535,9 +666,18 @@ async def cmd_topicimg_81(update, context):
 
     new_urls = _re81.findall(r"https?://\S+", body)
     reply = update.message.reply_to_message
+    # Give all sibling album updates a moment to enter the media-group cache.
+    if (getattr(reply, "media_group_id", None) or getattr(update.message, "media_group_id", None)):
+        await _a81.sleep(1.0)
     if reply is not None:
         new_urls.extend(await _photo_urls_from_message_81(context, reply))
     new_urls.extend(await _photo_urls_from_message_81(context, update.message))
+    for message in (reply, update.message):
+        group_id = str(getattr(message, "media_group_id", "") or "")
+        if group_id:
+            record = _ALBUM_BUF_81.get((owner_id, group_id), {})
+            new_urls.extend(record.get("urls") or [])
+    new_urls = list(dict.fromkeys(new_urls))
 
     if not new_urls and not urls:
         with _cx81.suppress(Exception):
@@ -600,7 +740,8 @@ if callable(_prev_cb_aitopic_81):
             return await _prev_cb_aitopic_81(update, context)
 
         chat_id, _title, thread_id = target
-        if position == "top":
+        composite_available = callable(globals().get("_send_topic_composite_81"))
+        if position == "top" and not composite_available:
             with _cx81.suppress(Exception):
                 await _send_slideshow_81(context, chat_id, urls, thread_id=thread_id)
         result = await _prev_cb_aitopic_81(update, context)
@@ -608,9 +749,14 @@ if callable(_prev_cb_aitopic_81):
         with _cx81.suppress(Exception):
             delivered = _topic_get_81(owner_id) is None
         if delivered:
-            if position == "bottom":
+            composite_sent = owner_id in _COMPOSITE_SENT_81
+            # If the one-message native composite failed, preserve every image
+            # with an ordered media-group fallback instead of silently losing
+            # top-position slides.
+            if not composite_sent:
                 with _cx81.suppress(Exception):
                     await _send_slideshow_81(context, chat_id, urls, thread_id=thread_id)
+            _COMPOSITE_SENT_81.discard(owner_id)
             _slides_clear_81(owner_id)
         return result
 
@@ -716,6 +862,7 @@ if "build_app" in globals():
                     registrar(app, name, callback, group=-700)
                 else:
                     app.add_handler(CommandHandler(name, callback), group=-700)  # type: ignore[name-defined]
+            app.add_handler(MessageHandler(filters.PHOTO, _capture_album_photo_81), group=-710)  # type: ignore[name-defined]
         return app
 
 
