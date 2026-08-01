@@ -750,7 +750,10 @@ if callable(_prev_cb_aitopic_81):
             delivered = _topic_get_81(owner_id) is None
         if delivered:
             composite_sent = owner_id in _COMPOSITE_SENT_81
-            if position == "bottom" and not composite_sent:
+            # If the one-message native composite failed, preserve every image
+            # with an ordered media-group fallback instead of silently losing
+            # top-position slides.
+            if not composite_sent:
                 with _cx81.suppress(Exception):
                     await _send_slideshow_81(context, chat_id, urls, thread_id=thread_id)
             _COMPOSITE_SENT_81.discard(owner_id)
