@@ -561,8 +561,14 @@ async def cb_aitopic_80(update, context):
     await query.answer("Sending…")
     sent = None
     try:
+        composite_sender = globals().get("_send_topic_composite_81")
+        if callable(composite_sender):
+            with _cx80.suppress(Exception):
+                sent = await composite_sender(
+                    context, owner_id, chat_id, row["draft_text"], thread_id=thread_id
+                )
         sender = globals().get("rich_send_77")
-        if callable(sender):
+        if sent is None and callable(sender):
             with _cx80.suppress(Exception):
                 sent = await sender(context.bot, chat_id, row["draft_text"], thread_id=thread_id)
         if sent is None:

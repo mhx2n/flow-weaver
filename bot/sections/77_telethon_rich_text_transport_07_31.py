@@ -399,6 +399,60 @@ async def rich_send_blocks_77(bot, chat_id, blocks, *, reply_to=None,
         _RICH77.sent_fail += 1
         _RICH77.last_error = f"Bot API rich blocks: {e}"[:300]
         _log77(_RICH77.last_error)
+
+    # Some Telegram deployments expose rich messages through the current
+    # MTProto layer before the HTTP Bot API accepts the equivalent JSON block
+    # schema.  Translate our small, validated block vocabulary to real TL
+    # PageBlocks instead of degrading mathematical expressions to plain text.
+    if _API_ID_77 and _API_HASH_77 and _TELETHON_OK_77:
+        try:
+            client = await _get_client_77()
+            peer = _peer_77(chat_id)
+            if client is not None and peer is not None:
+                def _rich_text(parts):
+                    values = []
+                    for part in parts if isinstance(parts, list) else [parts]:
+                        if isinstance(part, dict) and part.get("type") == "mathematical_expression":
+                            source = str(part.get("expression") or "").strip()
+                            if source:
+                                values.append(_tt77.TextMath(source=source))
+                        else:
+                            value = str(part or "")
+                            if value:
+                                values.append(_tt77.TextPlain(text=value))
+                    if not values:
+                        return _tt77.TextPlain(text=" ")
+                    return values[0] if len(values) == 1 else _tt77.TextConcat(texts=values)
+
+                page_blocks = []
+                for block in blocks:
+                    kind = str((block or {}).get("type") or "")
+                    if kind == "divider":
+                        page_blocks.append(_tt77.PageBlockDivider())
+                    elif kind == "paragraph":
+                        page_blocks.append(_tt77.PageBlockParagraph(text=_rich_text(block.get("text", []))))
+                if page_blocks:
+                    rich = _tt77.InputRichMessage(blocks=page_blocks)
+                    kw = {}
+                    if reply_to or thread_id:
+                        kw["reply_to"] = _tt77.InputReplyToMessage(
+                            reply_to_msg_id=_int77(reply_to or thread_id),
+                            top_msg_id=_int77(thread_id) or None,
+                        )
+                    result = await _a77.wait_for(
+                        client(_tfn77.messages.SendMessageRequest(
+                            peer=peer, message="rich math", rich_message=rich,
+                            random_id=_th77.generate_random_long(),
+                            silent=bool(silent), no_webpage=True, **kw,
+                        )), timeout=22.0,
+                    )
+                    mid = _msg_id_from_updates_77(result)
+                    if mid:
+                        _RICH77.note_ok()
+                        return _RichSentMessage77(bot, chat_id, mid, "")
+        except Exception as e:
+            _RICH77.last_error = f"MTProto rich blocks: {e}"[:300]
+            _log77(_RICH77.last_error)
     return None
 
 
