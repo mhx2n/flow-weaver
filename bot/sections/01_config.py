@@ -110,7 +110,7 @@ USE_PERPLEXITY_FALLBACK = True
 # ✅ DeepSeek (OpenAI-compatible) — optional third AI
 # ---------------------------
 # NOTE: Keep empty if you don't want DeepSeek button to work.
-
+#DEEPSEEK_API_KEY = ""  # set in Pella Env Vars
 #DEEPSEEK_BASE_URL = "https://openrouter.ai/api/v1"
 #DEEPSEEK_MODEL_TEXT = "deepseek/deepseek-r1-0528:free"
 

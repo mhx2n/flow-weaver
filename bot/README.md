@@ -112,3 +112,41 @@ rig in place we can iteratively collapse the patches into clean modules.
   override) anything defined earlier.
 - Never `import` a section file directly — they share globals via the
   runner, not via Python's normal import system.
+
+## Telegram Rich Text (native tables / LaTeX / task lists)
+
+Section `77_telethon_rich_text_transport_07_31.py` adds real Telegram Rich
+Messages through an MTProto side-client (Telethon) that logs in with the same
+bot token.
+
+Environment variables (optional):
+
+| Variable | Purpose |
+| --- | --- |
+| `TELEGRAM_API_ID` | api_id from https://my.telegram.org |
+| `TELEGRAM_API_HASH` | api_hash from https://my.telegram.org |
+| `RICH_TEXT` | set to `off` to hard-disable rich sending |
+
+Behaviour:
+
+* Every outbound text (user, admin, owner, AI answers, OCR answers) is upgraded
+  automatically — the transport hooks `Bot.send_message` / `Bot.edit_message_text`.
+* Short status/progress pings stay on the classic path so they can always be
+  edited and deleted as before.
+* Any missing credential or MTProto error falls back silently to the previous
+  HTML behaviour (with a 5-minute cooldown so users never see extra latency).
+
+Owner commands: `/rich on|off|status` and `/richdemo`.
+
+## Owner quiz generation (section 78)
+
+- `.aiq [standard] [count] [topic]` — reply to any text/topic message (or pass the
+  topic inline) to generate unlimited MCQs into the buffer, e.g.
+  `.aiq buet 50`, `.aiq dmc 30`, `.aiq board 100`.
+- `.gen med|eng|ver|std` now also accepts an exam standard token:
+  `buet cuet kuet ruet du ju cu ru sust dmc medical dental gst board hsc ssc bcs`.
+- Math MCQs are posted in two messages: a native rich-text card with the full
+  question + options (LaTeX preserved), followed by a quiz poll asking
+  "উপরের প্রশ্নের সঠিক উত্তর কোনটি?" with label-only options.
+- `/qver bn|en` — poll language/labels (ক খ গ ঘ vs A B C D).
+- `/mathpost on|off` — toggle the math two-message format.
