@@ -141,19 +141,36 @@ def _generated_payload_80(payload):
     return source.startswith("gen_") or source in ("ai", "aiq", "generated")
 
 
+_ANSWER_BALANCE_CACHE_80 = {}
+
+
 def _answer_counts_80(user_id, option_count):
+    current_size = 0
+    with _cx80.suppress(Exception):
+        current_size = int(buffer_count(user_id))  # type: ignore[name-defined]
+    cached = _ANSWER_BALANCE_CACHE_80.get((int(user_id), int(option_count)))
+    if cached and int(cached.get("size", -1)) == current_size:
+        return list(cached.get("counts") or [0] * option_count)
     counts = [0] * option_count
     with _cx80.suppress(Exception):
         for _, existing in buffer_list(user_id, limit=1000):  # type: ignore[name-defined]
             _, opts, answer = _payload_parts_80(existing)
             if len(opts) == option_count and 1 <= answer <= option_count:
                 counts[answer - 1] += 1
+    _ANSWER_BALANCE_CACHE_80[(int(user_id), int(option_count))] = {
+        "size": current_size,
+        "counts": list(counts),
+    }
     return counts
 
 
 def _rebalance_payload_80(user_id, payload):
     """Move the correct option to the least-used slot while preserving meaning."""
     data = dict(payload or {})
+    # Manual imports, forwarded Telegram polls and legacy regular polls retain
+    # their exact old behaviour. Strict rejection/balancing is generation-only.
+    if not _generated_payload_80(data):
+        return data
     question, options, answer = _payload_parts_80(data)
     if not question or len(options) < 2 or not (1 <= answer <= len(options)):
         return None
@@ -187,7 +204,17 @@ def buffer_add(user_id, payload):  # noqa: F811
     if checked is None:
         _log80("rejected incomplete/ambiguous quiz payload for user %s" % user_id, "warning")
         return None
-    return _prev_buffer_add_80(user_id, checked)
+    result = _prev_buffer_add_80(user_id, checked)
+    if _generated_payload_80(checked):
+        _, options, answer = _payload_parts_80(checked)
+        key = (int(user_id), len(options))
+        cached = _ANSWER_BALANCE_CACHE_80.get(key)
+        if cached and 1 <= answer <= len(options):
+            counts = list(cached.get("counts") or [0] * len(options))
+            counts[answer - 1] += 1
+            cached["counts"] = counts
+            cached["size"] = int(cached.get("size", 0)) + 1
+    return result
 
 
 globals()["buffer_add"] = buffer_add
