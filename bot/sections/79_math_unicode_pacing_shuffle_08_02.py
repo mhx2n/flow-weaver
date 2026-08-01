@@ -616,8 +616,13 @@ with _cx79.suppress(Exception):
 # 5) AI / OCR answer text also gets the math engine
 # ══════════════════════════════════════════════════════════════════════════
 
-for _name79 in ("clean_latex_for_telegram", "latex_to_unicode_65", "_latex_to_unicode_67",
-                "_unicode_math_66", "prettify_math_for_telegram"):
+# Chain into the formatter names that actually exist in sections 07/65-69.
+# Keep the older aliases too for deployments that still define them.
+for _name79 in (
+        "clean_latex", "_unicode_math_65", "_light_latex_to_visible_66",
+        "_advanced_latex_to_visible_67", "_math_to_visible_68", "_ocr_visible_math_69",
+        "clean_latex_for_telegram", "latex_to_unicode_65", "_latex_to_unicode_67",
+        "_unicode_math_66", "prettify_math_for_telegram"):
     _fn79 = globals().get(_name79)
     if callable(_fn79):
         def _wrap_math_79(prev=_fn79):
