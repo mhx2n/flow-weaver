@@ -340,6 +340,33 @@ globals()["_send_math_card_78"] = _send_math_card_79
 globals()["_send_math_card_79"] = _send_math_card_79
 
 
+# math detection that also catches backslash-stripped macros (vec{A}, frac{..})
+_MATH_HINT_79 = _re79.compile(
+    r"(?:\\|(?<![A-Za-z]))(?:frac|sqrt|vec|hat|int|sum|prod|lim|theta|pi|alpha|beta|"
+    r"circ|degree|times|cdot|pm|leq|geq|neq|infty|Rightarrow|sin|cos|tan|log|ln)"
+    r"(?![A-Za-z])|[√∫∑∏≤≥≠±∞π∂θ×÷⇒°⃗]|\$[^$\n]{2,}\$|"
+    r"[0-9A-Za-z\)\}]\s*\^\s*[0-9A-Za-z\{\-]|\d\s*/\s*\d"
+)
+
+_prev_is_math_79 = globals().get("_is_math_78")
+
+
+def _is_math_79(*chunks) -> bool:
+    s = " ".join(str(c or "") for c in chunks)
+    if not s.strip():
+        return False
+    if _MATH_HINT_79.search(s):
+        return True
+    if callable(_prev_is_math_79):
+        with _cx79.suppress(Exception):
+            return bool(_prev_is_math_79(*chunks))
+    return False
+
+
+globals()["_is_math_78"] = _is_math_79
+globals()["_is_math_79"] = _is_math_79
+
+
 # ══════════════════════════════════════════════════════════════════════════
 # 3) OPTION ORDER CONTROL (shuffle on/off — default OFF)
 # ══════════════════════════════════════════════════════════════════════════
