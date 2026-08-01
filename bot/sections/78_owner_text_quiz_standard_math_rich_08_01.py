@@ -195,7 +195,7 @@ if callable(_prev_cmd_gen_78):
             )
             if std:
                 context.args = cleaned
-        globals()["_active_std_78"] = std or globals().get("_sticky_std_78")
+        globals()["_active_std_78"] = std
         try:
             return await _prev_cmd_gen_78(update, context)
         finally:
@@ -275,7 +275,6 @@ async def cmd_aiq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     ocr_ctx = {"clean_text": topic, "raw_markdown": topic, "items": [], "source_label": "text"}
     globals()["_active_std_78"] = std
-    globals()["_sticky_std_78"] = std
     total_added = total_dup = 0
     try:
         remaining = int(count)
