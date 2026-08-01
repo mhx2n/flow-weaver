@@ -291,6 +291,63 @@ def _rich_math_card_79(question: str, options, explanation: str = "", lang: str 
     return "\n".join(lines).strip()
 
 
+_LATEX_MACROS_79 = (
+    "frac", "dfrac", "tfrac", "sqrt", "int", "iint", "oint", "sum", "prod",
+    "lim", "sin", "cos", "tan", "cot", "sec", "csc", "log", "ln", "exp",
+    "pm", "mp", "times", "cdot", "div", "leq", "geq", "neq", "approx",
+    "infty", "partial", "nabla", "theta", "alpha", "beta", "gamma", "delta",
+    "lambda", "mu", "pi", "rho", "sigma", "phi", "psi", "omega", "vec",
+    "hat", "bar", "overline", "dot", "rightarrow", "Rightarrow", "to",
+    "left", "right", "text", "mathrm", "mathbf", "begin", "end",
+)
+_LATEX_MACRO_RX_79 = _re79.compile(
+    r"(?<![A-Za-z\\])(" + "|".join(sorted(_LATEX_MACROS_79, key=len, reverse=True)) + r")(?![A-Za-z])"
+)
+
+
+def _repair_latex_source_79(source: str) -> str:
+    """Repair backslashes lost by older poll sanitisers, without flattening math."""
+    s = str(source or "").strip()
+    s = s.replace("\\\\", "\\")
+    s = _LATEX_MACRO_RX_79.sub(lambda m: "\\" + m.group(1), s)
+    return s
+
+
+def _rich_text_parts_79(text: str):
+    """Convert $...$/$$...$$ runs to explicit Bot API rich math entities."""
+    source = str(text or "")
+    parts = []
+    pos = 0
+    token_rx = _re79.compile(r"\$\$([\s\S]+?)\$\$|(?<!\$)\$([^$\n]+?)\$(?!\$)")
+    for match in token_rx.finditer(source):
+        if match.start() > pos:
+            parts.append(source[pos:match.start()])
+        expression = _repair_latex_source_79(match.group(1) or match.group(2) or "")
+        if expression:
+            parts.append({"type": "mathematical_expression", "expression": expression})
+        pos = match.end()
+    if pos < len(source):
+        parts.append(source[pos:])
+    if not parts:
+        parts = [source]
+    return [part for part in parts if part != ""]
+
+
+def _rich_math_blocks_79(question: str, options, lang: str = "bn"):
+    labels = _LABELS_EN_79 if lang == "en" else _LABELS_BN_79
+    blocks = [{"type": "paragraph", "text": _rich_text_parts_79(question)}]
+    blocks.append({"type": "divider"})
+    for i, option in enumerate(options or []):
+        if not str(option or "").strip():
+            continue
+        label = labels[i] if i < len(labels) else str(i + 1)
+        blocks.append({
+            "type": "paragraph",
+            "text": [f"({label}) "] + _rich_text_parts_79(str(option)),
+        })
+    return blocks
+
+
 globals()["_rich_math_card_78"] = _rich_math_card_79
 globals()["_rich_math_card_79"] = _rich_math_card_79
 
@@ -298,8 +355,18 @@ globals()["_rich_math_card_79"] = _rich_math_card_79
 globals()["_tidy_latex_78"] = mathify_79
 
 
-async def _send_math_card_79(bot, chat_id, markdown, *, reply_to=None, thread_id=None) -> bool:
-    """Native MTProto rich first, then a clean HTML card. Never raises."""
+async def _send_math_card_79(bot, chat_id, markdown, *, reply_to=None, thread_id=None,
+                             raw_question=None, raw_options=None, lang="bn") -> bool:
+    """Send native formula blocks first, then rich Markdown, then clean HTML."""
+    block_sender = globals().get("rich_send_blocks_77")
+    if callable(block_sender) and raw_question is not None and raw_options is not None:
+        with _cx79.suppress(Exception):
+            blocks = _rich_math_blocks_79(raw_question, raw_options, lang)
+            msg = await block_sender(
+                bot, chat_id, blocks, reply_to=reply_to, thread_id=thread_id
+            )
+            if msg:
+                return True
     sender = globals().get("rich_send_77")
     if callable(sender):
         with _cx79.suppress(Exception):
@@ -338,6 +405,55 @@ async def _send_math_card_79(bot, chat_id, markdown, *, reply_to=None, thread_id
 
 globals()["_send_math_card_78"] = _send_math_card_79
 globals()["_send_math_card_79"] = _send_math_card_79
+
+
+# Section 78's poll wrapper calls this name.  Replace it so the original raw
+# question/options reach the structured rich-block sender instead of being
+# flattened to Unicode before Telegram sees them.
+_PTB_SEND_POLL_RICH_79 = globals().get("_PTB_SEND_POLL_78")
+
+
+async def _send_poll_rich_79(self, chat_id=None, question=None, options=None, *args, **kwargs):
+    q_text = kwargs.pop("question", question)
+    opts = kwargs.pop("options", options)
+    cid = kwargs.pop("chat_id", chat_id)
+    opt_list = [str(getattr(o, "text", o) or "").strip() for o in (opts or [])]
+    try:
+        already = any(m in str(q_text or "") for m in globals().get("_POLL_MARK_78", ()))
+        if not already and globals().get("_math_post_on_78", lambda: False)() and len(opt_list) >= 2:
+            raw_items = globals().get("_RAW_ITEMS_78", {})
+            key_fn = globals().get("_norm_key_78")
+            raw = raw_items.get(key_fn(q_text), {}) if callable(key_fn) else {}
+            raw_q = str(raw.get("questions") or q_text or "")
+            raw_opts = [o for o in (raw.get("options") or []) if str(o or "").strip()] or opt_list
+            if len(raw_opts) != len(opt_list):
+                raw_opts = opt_list
+            is_math = globals().get("_is_math_78")
+            if callable(is_math) and is_math(raw_q, " ".join(raw_opts), str(raw.get("explanation") or "")):
+                lang_fn = globals().get("_quiz_lang_78")
+                lang_now = lang_fn() if callable(lang_fn) else "bn"
+                card = _rich_math_card_79(raw_q, raw_opts, str(raw.get("explanation") or ""), lang_now)
+                sent = await _send_math_card_79(
+                    self, cid, card, thread_id=kwargs.get("message_thread_id"),
+                    raw_question=raw_q, raw_options=raw_opts, lang=lang_now,
+                )
+                if sent and callable(_PTB_SEND_POLL_RICH_79):
+                    labels = _LABELS_EN_79 if lang_now == "en" else _LABELS_BN_79
+                    poll_opts = [f"({labels[i] if i < len(labels) else i + 1})" for i in range(len(opt_list))]
+                    prompt_fn = globals().get("_poll_prompt_78")
+                    prompt = prompt_fn(lang_now) if callable(prompt_fn) else "Choose the correct answer"
+                    return await _PTB_SEND_POLL_RICH_79(self, cid, prompt, poll_opts, *args, **kwargs)
+    except Exception as e:
+        _log79("structured math post skipped: %s" % e)
+    if callable(_PTB_SEND_POLL_RICH_79):
+        return await _PTB_SEND_POLL_RICH_79(self, cid, q_text, opts, *args, **kwargs)
+    return None
+
+
+if callable(_PTB_SEND_POLL_RICH_79):
+    globals()["_send_poll_78"] = _send_poll_rich_79
+    with _cx79.suppress(Exception):
+        _tg79.Bot.send_poll = _send_poll_rich_79
 
 
 # math detection that also catches backslash-stripped macros (vec{A}, frac{..})
