@@ -147,7 +147,7 @@ def _wrap_79(s: str) -> str:
     return t
 
 
-_MACRO_RE_79 = _re79.compile(r"(?<![A-Za-z])\\?([A-Za-z]{2,12})\b")
+_MACRO_RE_79 = _re79.compile(r"(?:\\|(?<![A-Za-z]))([A-Za-z]{2,12})\b")
 
 
 def _accent_79(s: str) -> str:
@@ -155,7 +155,7 @@ def _accent_79(s: str) -> str:
     def one(name, mark_fn):
         nonlocal s
         pat_brace = _re79.compile(r"\\?" + name + r"\s*\{([^{}]{1,20})\}")
-        pat_bare = _re79.compile(r"(?<![A-Za-z])\\?" + name + r"\s*([A-Za-z0-9])(?![A-Za-z])")
+        pat_bare = _re79.compile(r"(?:\\|(?<![A-Za-z]))" + name + r"\s*([A-Za-z0-9])(?![A-Za-z])")
         for _ in range(6):
             new = pat_brace.sub(lambda m: mark_fn((m.group(1) or "").strip()), s)
             new = pat_bare.sub(lambda m: mark_fn((m.group(1) or "").strip()), new)
@@ -190,12 +190,9 @@ def mathify_79(text: str) -> str:
     s = _re79.sub(r"\\\[(.+?)\\\]", r"\1", s, flags=_re79.S)
     s = _re79.sub(r"\$\$(.+?)\$\$", r"\1", s, flags=_re79.S)
     s = _re79.sub(r"\$([^$\n]+?)\$", r"\1", s)
-    s = _re79.sub(r"\\\\", "\n", s)
-    # every macro is handled bare below, so drop the escaping backslash once
-    s = _re79.sub(r"\\(?=[A-Za-z])", "", s)
-    s = _re79.sub(r"(?<![A-Za-z])\\?(?:displaystyle|limits|nolimits)\b", "", s)
-    s = _re79.sub(r"(?<![A-Za-z])\\?(?:left|right)\s*(?=[\(\)\[\]\|\.\{\}])", "", s)
-    s = _re79.sub(r"(?<![A-Za-z])\\?(?:text|mathrm|mathbf|textbf|textit|mathit|operatorname)\s*\{([^{}]*)\}", r"\1", s)
+    s = _re79.sub(r"(?:\\|(?<![A-Za-z]))(?:displaystyle|limits|nolimits)\b", "", s)
+    s = _re79.sub(r"(?:\\|(?<![A-Za-z]))(?:left|right)\s*(?=[\(\)\[\]\|\.\{\}])", "", s)
+    s = _re79.sub(r"(?:\\|(?<![A-Za-z]))(?:text|mathrm|mathbf|textbf|textit|mathit|operatorname)\s*\{([^{}]*)\}", r"\1", s)
 
     # accents (vec / hat / bar / dot)
     s = _accent_79(s)
@@ -204,8 +201,8 @@ def mathify_79(text: str) -> str:
     s = _re79.sub(r"\^\s*\{?\s*\\?(?:circ|degree|deg)\s*\}?", "°", s)
 
     # roots + fractions, innermost first (they nest inside each other)
-    frac_re = _re79.compile(r"(?<![A-Za-z])\\?(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
-    root_re = _re79.compile(r"(?<![A-Za-z])\\?sqrt\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}")
+    frac_re = _re79.compile(r"(?:\\|(?<![A-Za-z]))(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}")
+    root_re = _re79.compile(r"(?:\\|(?<![A-Za-z]))sqrt\s*(?:\[([^\]]*)\])?\s*\{([^{}]*)\}")
     for _ in range(10):
         new = root_re.sub(
             lambda m: ("∛" if (m.group(1) or "").strip() == "3" else "√") + _wrap_79(m.group(2)), s)
@@ -213,8 +210,8 @@ def mathify_79(text: str) -> str:
         if new == s:
             break
         s = new
-    s = _re79.sub(r"(?<![A-Za-z])\\?sqrt\s*([A-Za-z0-9])", r"√\1", s)
-    s = _re79.sub(r"(?<![A-Za-z])\\?(?:d|t)?frac\s+([A-Za-z0-9])\s*([A-Za-z0-9])", r"\1/\2", s)
+    s = _re79.sub(r"(?:\\|(?<![A-Za-z]))sqrt\s*([A-Za-z0-9])", r"√\1", s)
+    s = _re79.sub(r"(?:\\|(?<![A-Za-z]))(?:d|t)?frac\s+([A-Za-z0-9])\s*([A-Za-z0-9])", r"\1/\2", s)
 
     # trig / log function names keep their name, drop the backslash
     s = _re79.sub(r"\\(sin|cos|tan|cot|sec|csc|log|ln|exp|lim|max|min|arcsin|arccos|arctan)\b", r"\1", s)
