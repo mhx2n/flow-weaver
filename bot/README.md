@@ -150,3 +150,12 @@ Owner commands: `/rich on|off|status` and `/richdemo`.
   "উপরের প্রশ্নের সঠিক উত্তর কোনটি?" with label-only options.
 - `/qver bn|en` — poll language/labels (ক খ গ ঘ vs A B C D).
 - `/mathpost on|off` — toggle the math two-message format.
+- `/shuffle on|off` — option order. **Default OFF** → options stay in the
+  original ক খ গ ঘ order (no more এলোমেলো order).
+- `/postdelay <seconds>` — pause between two quiz posts. **Default 3 s**, so
+  Telegram never rate-limits and the bot never freezes mid-post.
+- All math text (questions, options, poll explanations, AI/OCR answers) now
+  passes through the section-79 Unicode math engine, which repairs
+  backslash-stripped LaTeX (`vec{A}`, `hat{i}`, `frac{5}{sqrt{2}}`,
+  `90^circ`, `Rightarrow`) into clean professional math: `A⃗`, `î`, `5/√2`,
+  `90°`, `⇒`.
