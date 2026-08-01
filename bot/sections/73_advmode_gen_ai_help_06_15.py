@@ -231,6 +231,19 @@ def _help_index_for_73(role: str):
 
 
 def _format_help_list_73(role: str) -> str:
+    if role == "user":
+        return (
+            "📚 প্রবাহ Control Center\n"
+            "│ Role: USER\n"
+            "│ Owner Contact: @Your_Himus\n\n"
+            "👤 User Commands\n"
+            "│ /start or .start — Welcome / membership check\n"
+            "│ /help or .help — Show the detailed command guide\n"
+            "│ /cmd or .cmd — Show all available commands\n"
+            "│ /q or .q — Contact support by text or by replying to a file/photo\n"
+            "│ /aion or .aion — Enable private AI solving\n"
+            "│ /aioff or .aioff — Disable private AI solving"
+        )
     rows = _help_index_for_73(role)
     title = {"owner": "👑 Owner Panel", "admin": "🛡 Admin Panel", "user": "👤 User Panel"}[role]
     lines = [f"<b>{title} — Commands</b>", ""]
