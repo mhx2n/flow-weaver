@@ -82,6 +82,30 @@ if callable(_old_fast_prompt_88):
     globals()["_make_fast_new_mcq_prompt_74"] = _make_fast_new_mcq_prompt_74
 
 
+_old_normalise_88 = globals().get("_normalise_mcq_74")
+if callable(_old_normalise_88):
+    def _normalise_mcq_74(item):  # noqa: F811
+        row = _old_normalise_88(item)
+        if not isinstance(row, dict):
+            return None
+        lang = _generation_lang_88(str((item or {}).get("question") or ""))
+        question = str(row.get("question") or "")
+        explanation = str(row.get("explanation") or "")
+        if lang == "bn":
+            # Formula-only options are valid, but the stem and explanation must
+            # carry real Bengali prose. Rejecting here makes the provider loop
+            # continue instead of storing an English item despite the prompt.
+            if len(_BN_88.findall(question)) < 5:
+                return None
+            if explanation and len(_BN_88.findall(explanation)) < 5:
+                return None
+        elif _BN_88.search(question + " " + explanation):
+            return None
+        return row
+
+    globals()["_normalise_mcq_74"] = _normalise_mcq_74
+
+
 _old_generate_sync_88 = globals().get("_generate_quizzes_from_ocr_sync")
 if callable(_old_generate_sync_88):
     def _generate_quizzes_from_ocr_sync(ocr_ctx, desired, user_id):  # noqa: F811
