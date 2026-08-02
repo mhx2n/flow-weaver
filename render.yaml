@@ -59,3 +59,63 @@ services:
         value: "10000"
       - key: PYTHON_VERSION
         value: 3.11.9
+      # ─── Telegram Rich Text (MTProto) ──────────────────────────────
+      - key: TELEGRAM_API_ID         # my.telegram.org → App api_id
+        sync: false
+      - key: TELEGRAM_API_HASH       # my.telegram.org → App api_hash
+        sync: false
+
+      # ─── Command menu ──────────────────────────────────────────────
+      # Owner sees the FULL command list in Telegram's "/" menu after every
+      # restart (pushed by sections 26 / 49 / 86 on post_init).
+      - key: OWNER_MENU_FULL
+        value: "1"
+
+# ════════════════════════════════════════════════════════════════════════
+# FULL COMMAND REFERENCE (pushed to the "/" menu on restart)
+# ════════════════════════════════════════════════════════════════════════
+# USER
+#   /start .start        Welcome / membership check
+#   /help .help          Compact user command card
+#   /cmd .cmd            All available commands
+#   /q .q                Contact support (text or reply to file/photo)
+#   /aion .aion          Enable private AI solving
+#   /aioff .aioff        Disable private AI solving
+#   .gen <N>             Generate N MCQs from a replied photo/PDF page
+#   .gen ver <N>         Verbatim generation
+#   .gen p<n> <N>        PDF page-by-page generation
+#   .solve               Solve an MCQ shown in chat
+#   .done /done          Export buffer (CSV + JSON)
+#   .clear /buffer       Clear / inspect the MCQ buffer
+#
+# ADMIN
+#   /ban /unban <id>     Ban / unban a user
+#   /userinfo <id>       User details
+#   /broadcast           Message every user
+#   /stats               Usage statistics
+#   /filter              Add a parsing filter
+#   /vision_on /vision_off   Toggle vision OCR access
+#
+# OWNER
+#   /advmode                       Advanced-Mode AI provider registry
+#   /advadd <name> <key>           Add provider (kind auto-detected)
+#   /advrm <id>  /advprio <id> <n> Remove / prioritise provider
+#   /addkey /keys /delkey          AI key pool management
+#   /gemini /mistral /mk /models   Provider pools & model switching
+#   /elevenlabs /el_log            Voice-to-text key + logs
+#   .setgenlimit <N>|<uid> <N>     Daily .gen limit (global / per-user)
+#   .getgenlimit [uid]             Show daily limit + usage
+#   .resetgenlimit <uid>           Drop daily override
+#   .userlimit …                   Alias of .setgenlimit
+#   .setpagelimit <N>|<uid> <N>    Per-page MCQ cap (global / per-user)
+#   .getpagelimit [uid]            Show per-page cap
+#   .resetpagelimit <uid>          Drop per-page override
+#   .aiq <text>                    Generate quiz from plain text
+#   /stopquiz                      Stop a running quiz posting job
+#   .linktopic <post link>         Use a post as the quiz topic anchor
+#   .topicimg [top|bottom]         Attach slide images to the topic card
+#   /postdelay <sec>               Delay between quiz posts
+#   /shuffle on|off                Option shuffling
+#   /mongobackup /mongorestore     MongoDB backup / restore
+#   /promote /demote <uid>         Manage admins
+#   /restart /info /features       Process & diagnostics
