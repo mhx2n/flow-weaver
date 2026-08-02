@@ -48,7 +48,7 @@ _EXPLICIT_BN_87 = _re87.compile(
 _BANGLISH_87 = {
     "ami", "amake", "amar", "amader", "amra", "apni", "apnar", "tumi", "tumi", "tomar",
     "ki", "kivabe", "kibhabe", "kemon", "keno", "kano", "kn", "kothay", "kokhon", "kon",
-    "eta", "eita", "ota", "oita", "egulo", "eigulo", "gulo", " gula", "sob", "shob",
+    "eta", "eita", "ota", "oita", "egulo", "eigulo", "gulo", "gula", "sob", "shob", "kisu",
     "bolo", "bolen", "bol", "dao", "daw", "den", "dewa", "diye", "dibo", "diben",
     "koro", "kor", "kore", "korbo", "korte", "korben", "banaw", "banao", "banate",
     "bujhao", "bujhiye", "bujhte", "shikhao", "sajao", "shajiye", "guchiye",
@@ -56,7 +56,7 @@ _BANGLISH_87 = {
     "tar", "jonno", "sathe", "theke", "moddhe", "kache", "pore", "age", "abar",
     "akare", "vabe", "bhabe", "moto", "mot", "ektu", "onek", "aro", "shudhu", "sudhu",
     "proshno", "prosno", "uttor", "somadhan", "shomadhan", "onko", "ongko", "porikkha",
-    "porashona", "routine", "bishoy", "bisoy", "chobi", "lekha", "table", "admission",
+    "porashona", "routine", "bishoy", "bisoy", "bisleshon", "chobi", "lekha", "table", "admission",
 }
 _BANGLISH_STRONG_87 = {
     "amake", "kivabe", "kibhabe", "bujhiye", "shajiye", "guchiye", "jonno", "akare",
@@ -186,6 +186,36 @@ globals()["_latest_user_turn_87"] = _latest_user_turn_87
 globals()["_detect_language_87"] = _detect_language_87
 globals()["_detect_lang_86"] = _detect_language_87
 
+# Older quiz/MCQ builders use `_is_bangla_text()` and previously recognised
+# Bengali Unicode only. Route them through the same Banglish-aware decision so
+# generated questions, poll explanations and verification explanations all use
+# the seed/user language. English is English-only (the legacy bilingual rule is
+# deliberately removed because it violated language mirroring).
+def _is_bangla_text_87(text: str) -> bool:
+    return _detect_language_87(text) == "bn"
+
+
+def _quiz_language_rule_block_87(is_bn: bool) -> str:
+    if is_bn:
+        return (
+            "The question/seed is Bangla or Banglish. Write every question, option, and "
+            "explanatory sentence in natural Bangla script only; retain only technical terms, "
+            "symbols, formulas, code, and proper nouns in English."
+        )
+    return (
+        "The question/seed is English. Write every question, option, and explanation in "
+        "English only; do not add a Bangla translation."
+    )
+
+
+def _quiz_schema_example_explanation_87(is_bn: bool) -> str:
+    return "বাংলায় সংক্ষিপ্ত ব্যাখ্যা..." if is_bn else "Short explanation in English..."
+
+
+globals()["_is_bangla_text"] = _is_bangla_text_87
+globals()["_quiz_language_rule_block"] = _quiz_language_rule_block_87
+globals()["_quiz_schema_example_explanation"] = _quiz_schema_example_explanation_87
+
 
 _prev_solver_87 = globals().get("_solve_text_with_preference")
 _prev_prompt_backend_87 = globals().get("_try_gemini_text_backends")
@@ -244,6 +274,7 @@ if callable(_old_ocr_builder87):
     globals()["_build_master_ocr_prompt"] = _build_master_ocr_prompt
 
 
-_log87("final language lock active: latest-turn detection + Banglish + output validation/repair")
+_log87("final language lock active: latest-turn detection + Banglish + output validation/repair "
+       "+ MCQ/quiz language mirror")
 
 # ===== END SECTION 87 =====
