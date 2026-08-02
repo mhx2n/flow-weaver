@@ -249,6 +249,83 @@ globals()["_rich_math_blocks_83"] = _rich_math_blocks_88
 globals()["_rich_math_blocks_88"] = _rich_math_blocks_88
 
 
+# Section 81's old script-count detector is still consulted by its wrapper.
+# Point it at the final Banglish-aware detector so transliterated Bangla can
+# never append an "ENGLISH ONLY" instruction before our final lock.
+def _detect_lang_81_88(source):
+    detector = globals().get("_detect_language_87")
+    if callable(detector):
+        with _cx88.suppress(Exception):
+            return "bn" if detector(str(source or "")) == "bn" else "en"
+    return _generation_lang_88(str(source or ""))
+
+
+globals()["_detect_lang_81"] = _detect_lang_81_88
+
+
+# Keep the classic HTML fallback visually consistent with native rich output.
+# The old converter handled only one-level fractions and could join prose words.
+def _light_latex_to_visible_88(text):
+    converter = globals().get("mathify_79")
+    if callable(converter):
+        with _cx88.suppress(Exception):
+            return str(converter(text) or "")
+    return str(text or "")
+
+
+globals()["_light_latex_to_visible_66"] = _light_latex_to_visible_88
+
+
+def _safe_cut_88(text: str, limit: int) -> int:
+    """Choose a paragraph boundary that does not split math/brackets."""
+    source = str(text or "")
+    balanced = globals().get("_balanced_83")
+    candidates = []
+    for marker in ("\n\n", "\n", "।", ". "):
+        pos = source.rfind(marker, 0, limit)
+        while pos >= int(limit * 0.5):
+            prefix = source[:pos]
+            if not callable(balanced) or balanced(prefix):
+                candidates.append(pos)
+                break
+            pos = source.rfind(marker, 0, pos)
+    if candidates:
+        return max(candidates)
+    # Never cut inside an open $ expression; extend to its closing fence when
+    # reasonably close, otherwise retreat to before the opening fence.
+    prefix = source[:limit]
+    if prefix.count("$") % 2:
+        opening = prefix.rfind("$")
+        if opening >= int(limit * 0.5):
+            return opening
+    return limit
+
+
+def _split_answer_chunks_88(text, *, limit=2800, max_chunks=4):
+    sanitizer = globals().get("_sanitize_rich_answer_66")
+    source = str(text or "")
+    if callable(sanitizer):
+        with _cx88.suppress(Exception):
+            source = str(sanitizer(source) or source)
+    chunks = []
+    while source and len(chunks) < max(1, int(max_chunks)):
+        if len(source) <= limit:
+            chunks.append(source.strip())
+            source = ""
+            break
+        cut = _safe_cut_88(source, int(limit))
+        chunks.append(source[:cut].strip())
+        source = source[cut:].strip()
+    # Preserve complete remaining content rather than adding a misleading
+    # truncation ellipsis or cutting through the final formula.
+    if source:
+        chunks.append(source.strip())
+    return [chunk for chunk in chunks if chunk] or [""]
+
+
+globals()["_split_answer_chunks_66"] = _split_answer_chunks_88
+
+
 _log88("final math card active: quiz language follows /qver; mixed prose is never TextMath")
 
 # ===== END SECTION 88 =====
