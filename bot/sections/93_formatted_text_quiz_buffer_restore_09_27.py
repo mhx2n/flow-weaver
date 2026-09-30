@@ -146,6 +146,17 @@ def _autobuf_on() -> bool:  # noqa: F811
         return True
 
 
+def _restore_autobuf_once_93() -> None:
+    """Turn the feature back on once; later /autobuf choices still persist."""
+    try:
+        marker = str(get_setting("text_autobuf_restored_93", "") or "").strip()  # type: ignore[name-defined]
+        if marker != "1":
+            set_setting("text_autobuf_on", "1")  # type: ignore[name-defined]
+            set_setting("text_autobuf_restored_93", "1")  # type: ignore[name-defined]
+    except Exception as exc:
+        _log93("could not persist one-time auto-buffer restore: %s" % type(exc).__name__, "warning")
+
+
 def split_blocks(text: str):  # noqa: F811
     return _formatted_mcq_blocks_93(text)
 
@@ -173,6 +184,7 @@ globals()["split_blocks"] = split_blocks
 globals()["parse_text_block"] = parse_text_block
 globals()["handle_text"] = handle_text
 
+_restore_autobuf_once_93()
 _log93("formatted text quiz auto-buffer restored with bracket-safe parsing")
 
 # ===== END SECTION 93 =====
